@@ -6,7 +6,8 @@ from kungfu import Error
 from msgspex import Model
 from rnet import Client
 
-from saronia import API, RnetClient, StatusError, get, post
+from saronia import API, APIResult, RnetClient, StatusError, get, post
+from saronia.error import NetworkError
 
 
 class Book(Model):
@@ -16,25 +17,21 @@ class Book(Model):
 
 
 # Using StatusError decorator to associate errors with HTTP statuses
-@StatusError[HTTPStatus.BAD_REQUEST, HTTPStatus.UNPROCESSABLE_ENTITY]
-class ValidationError(Model):
+class ValidationError(Model, StatusError[HTTPStatus.BAD_REQUEST, HTTPStatus.UNPROCESSABLE_ENTITY]):
     message: str
     details: dict[str, list[str]] | None = None
 
 
-@StatusError[HTTPStatus.NOT_FOUND]
-class NotFoundError(Model):
+class NotFoundError(Model, StatusError[HTTPStatus.NOT_FOUND]):
     message: str
     resource: str
 
 
-@StatusError[HTTPStatus.UNAUTHORIZED]
-class UnauthorizedError(Model):
+class UnauthorizedError(Model, StatusError[HTTPStatus.UNAUTHORIZED]):
     message: str
 
 
-@StatusError[HTTPStatus.INTERNAL_SERVER_ERROR]
-class ServerError(Model):
+class ServerError(Model, StatusError[HTTPStatus.INTERNAL_SERVER_ERROR]):
     message: str
     trace_id: str | None = None
 
@@ -50,10 +47,10 @@ cool_api = API.endpoint("/api/v1")
 @cool_api("/books")
 class BooksController:
     @get("/{book_id}")
-    async def get_book_by_id(self, book_id: UUID) -> "APIResult[Book, ValidationError | NotFoundError | UnauthorizedError]": ...
+    async def get_book_by_id(self, book_id: UUID) -> APIResult[Book, ValidationError | NotFoundError | UnauthorizedError]: ...
 
     @post("/create", CreateBookDTO)
-    async def create_book(self) -> "APIResult[Book, ValidationError | ServerError]": ...
+    async def create_book(self) -> APIResult[Book, ValidationError | ServerError]: ...
 
 
 books = BooksController()
@@ -87,6 +84,8 @@ async def main() -> None:
                         print(f"Details: {details}")
                 case UnauthorizedError(message=msg):
                     print(f"\nUnauthorized: {msg}")
+                case NetworkError(message=msg, original_error=err):
+                    print("Network error:", msg, ", origin http client error:", repr(err))
                 case _:
                     print(f"\nUnexpected error: {api_error.error}")
         case _:
@@ -111,6 +110,8 @@ async def main() -> None:
                 print(f"Server error: {api_error.error.message}")
                 if api_error.error.trace_id:
                     print(f"Trace ID: {api_error.error.trace_id}")
+            else:
+                print("Network error:", api_error.error.message, ", origin http client error:", repr(api_error.error.original_error))
         case _:
             book = create_result.unwrap()
             print(f"Book created: {book.name} by {book.author}")

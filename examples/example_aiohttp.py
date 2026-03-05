@@ -5,7 +5,7 @@ from aiohttp import ClientSession
 from kungfu import Error
 from msgspex import Model
 
-from saronia import API, AiohttpClient, get, post
+from saronia import API, AiohttpClient, APIResult, get, post
 
 
 class Book(Model):
@@ -32,10 +32,10 @@ cool_api = API.endpoint("/api/v1")
 @cool_api("/books")
 class BooksController:
     @get("/{book_id}")
-    async def get_book_by_id(self, book_id: UUID) -> "APIResult[Book, ValidationError | NotFoundError]": ...
+    async def get_book_by_id(self, book_id: UUID) -> APIResult[Book, ValidationError | NotFoundError]: ...
 
     @post("/create", CreateBookDTO)
-    async def create_book(self) -> "APIResult[Book, ValidationError | NotFoundError]": ...
+    async def create_book(self) -> APIResult[Book, ValidationError | NotFoundError]: ...
 
 
 books = BooksController()

@@ -8,6 +8,8 @@ from reprlib import recursive_repr
 class NetworkError(Exception):
     """Raised when a network-level error occurs (connection failed, timeout, etc)."""
 
+    __match_args__ = ("message", "original_error")
+
     def __init__(self, message: str, original_error: BaseException | None = None) -> None:
         self.message = message
         self.original_error = original_error
@@ -20,20 +22,21 @@ class NetworkError(Exception):
 
 
 class StatusError:
-    """Decorator to associate HTTP status codes with error types.
+    """Usage:
+    ```python
+    class NotFoundError(Model, StatusError[HTTPStatus.NOT_FOUND]):
+        message: str
 
-    Usage:
-        @StatusError[HTTPStatus.NOT_FOUND]
-        class NotFoundError(Model):
-            message: str
-
-        @StatusError[HTTPStatus.BAD_REQUEST, HTTPStatus.UNPROCESSABLE_ENTITY]
-        class ValidationError(Model):
-            message: str
-            details: dict[str, list[str]]
+    class ValidationError(Model, StatusError[HTTPStatus.BAD_REQUEST, HTTPStatus.UNPROCESSABLE_ENTITY]):
+        message: str
+        details: dict[str, list[str]]
+    ```
     """
 
-    statuses: typing.ClassVar[tuple[HTTPStatus, ...]] = ()
+    if typing.TYPE_CHECKING:
+        statuses: typing.ClassVar[tuple[HTTPStatus, ...]]
+    else:
+        statuses = ()
 
     def __class_getitem__(cls, statuses: HTTPStatus | tuple[HTTPStatus, ...], /) -> typing.Any:
         return type(
@@ -57,6 +60,10 @@ class APIError[E](Exception):
         request_id: Request ID for tracing (optional)
 
     """
+
+    error: NetworkError | E
+
+    __match_args__ = ("error", "method", "status", "path", "request_id")
 
     def __init__(
         self,
