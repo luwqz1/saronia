@@ -20,7 +20,7 @@ pip install saronia[aiohttp]
 - Declarative API controller syntax
 - Type-safe request/response handling with `APIResult`
 - Support for multiple HTTP clients (rnet, aiohttp, or custom)
-- Comprehensive error handling with `StatusError` decorator
+- Comprehensive error handling with `StatusError`
 - Support for path parameters, query params, headers, JSON, form data, and file uploads
 - Built on top of `msgspex` for fast serialization and `kungfu` for Result types
 
