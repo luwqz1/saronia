@@ -53,6 +53,13 @@ dev = [
     "python-multipart>=0.0.22",
 ]
 
+[project.urls]
+Source = "https://github.com/luwqz1/saronia"
+"Bug Tracker" = "https://github.com/luwqz1/saronia/issues"
+
+[tool.uv]
+package = true
+
 [tool.ruff]
 line-length = 160
 target-version = "py314"

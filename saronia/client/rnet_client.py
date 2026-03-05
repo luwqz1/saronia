@@ -8,7 +8,7 @@ from kungfu import Error, Ok, Option, Result
 from msgspex import decoder, encoder
 
 from saronia.client.abc import ABCClient, MultipartFile
-from saronia.error import APIError, NetworkError
+from saronia.error import APIError, NetworkError, UnknownError
 
 if typing.TYPE_CHECKING:
     import rnet
@@ -93,7 +93,7 @@ class RnetClient(ABCClient):
             request_id = None if not request_id else request_id.decode()
 
             if not error_data:
-                return Error(APIError(None, method, status, path=path, request_id=request_id))
+                return Error(APIError(UnknownError(error_data), method, status, path=path, request_id=request_id))
 
             for error_type in errors:
                 try:
@@ -102,7 +102,7 @@ class RnetClient(ABCClient):
                 except Exception:
                     continue
 
-            return Error(APIError(error_data, method, status, path=path, request_id=request_id))
+            return Error(APIError(UnknownError(error_data), method, status, path=path, request_id=request_id))
 
         except (
             rnet.exceptions.ConnectionError,

@@ -110,8 +110,10 @@ async def main() -> None:
                 print(f"Server error: {api_error.error.message}")
                 if api_error.error.trace_id:
                     print(f"Trace ID: {api_error.error.trace_id}")
-            else:
+            elif isinstance(api_error.error, NetworkError):
                 print("Network error:", api_error.error.message, ", origin http client error:", repr(api_error.error.original_error))
+            else:
+                print("Unknown error:", api_error.error.message.decode(), "http status:", repr(api_error.status))
         case _:
             book = create_result.unwrap()
             print(f"Book created: {book.name} by {book.author}")

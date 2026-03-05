@@ -8,7 +8,7 @@ from kungfu.library.monad.option import NOTHING
 from msgspex import decoder, encoder
 
 from saronia.client.abc import ABCClient, MultipartFile
-from saronia.error import APIError, NetworkError
+from saronia.error import APIError, NetworkError, UnknownError
 
 if typing.TYPE_CHECKING:
     import aiohttp
@@ -88,7 +88,7 @@ class AiohttpClient(ABCClient):
                 request_id = resp.headers.get("X-Request-ID") or resp.headers.get("Request-ID")
 
                 if not error_data:
-                    return Error(APIError(None, method, status, path=path, request_id=request_id))
+                    return Error(APIError(UnknownError(error_data), method, status, path=path, request_id=request_id))
 
                 for error_type in errors:
                     try:
@@ -97,7 +97,7 @@ class AiohttpClient(ABCClient):
                     except Exception:
                         continue
 
-                return Error(APIError(error_data, method, status, path=path, request_id=request_id))
+                return Error(APIError(UnknownError(error_data), method, status, path=path, request_id=request_id))
 
         except (aiohttp.client_exceptions.ClientError, aiohttp.http_exceptions.HttpProcessingError) as error:
             return Error(

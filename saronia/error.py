@@ -1,8 +1,14 @@
 from __future__ import annotations
 
+import dataclasses
 import typing
 from http import HTTPMethod, HTTPStatus
 from reprlib import recursive_repr
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class UnknownError:
+    message: bytes
 
 
 class NetworkError(Exception):
@@ -49,7 +55,7 @@ class StatusError:
         )
 
 
-class APIError[E](Exception):
+class APIError[E = typing.Never](Exception):
     """Represents an API error response.
 
     Attributes:
@@ -61,7 +67,7 @@ class APIError[E](Exception):
 
     """
 
-    error: NetworkError | E
+    error: E | NetworkError | UnknownError
 
     __match_args__ = ("error", "method", "status", "path", "request_id")
 
@@ -108,4 +114,4 @@ class APIError[E](Exception):
         return 500 <= self.status.value < 600
 
 
-__all__ = ("APIError", "NetworkError", "StatusError")
+__all__ = ("APIError", "NetworkError", "StatusError", "UnknownError")

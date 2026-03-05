@@ -17,6 +17,7 @@ from msgspex import Model
 
 import saronia
 from saronia import API, AiohttpClient, RnetClient, delete, get, patch, post, put
+from saronia.error import UnknownError
 from saronia.parameters import (
     JSON,
     FileBuffer,
@@ -871,7 +872,7 @@ class TestAiohttpErrors:
     async def test_empty_body_error_is_none(self, aiohttp_errors):
         err = assert_error(await aiohttp_errors.get_empty())
         assert err.status == HTTPStatus.NOT_FOUND
-        assert err.error is None
+        assert isinstance(err.error, UnknownError)
 
     @pytest.mark.asyncio
     async def test_error_carries_http_method(self, aiohttp_errors):
@@ -1071,7 +1072,7 @@ class TestRnetErrors:
     async def test_empty_body_error_is_none(self, rnet_errors):
         err = assert_error(await rnet_errors.get_empty())
         assert err.status == HTTPStatus.NOT_FOUND
-        assert err.error is None
+        assert isinstance(err.error, UnknownError)
 
     @pytest.mark.asyncio
     async def test_error_carries_http_method(self, rnet_errors):
