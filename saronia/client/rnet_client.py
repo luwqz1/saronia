@@ -8,6 +8,7 @@ from io import IOBase
 from kungfu import Error, Ok, Option, Result
 from msgspex import decoder, encoder
 
+from saronia.auth import AuthError
 from saronia.client.base import DEFAULT_TIMEOUT, DEFAULT_USER_AGENT, BaseClient, MultipartFile
 from saronia.error import APIError, NetworkError, UnknownError
 
@@ -53,6 +54,7 @@ class RnetClient(BaseClient):
         query_params: Option[typing.Mapping[str, typing.Any]],
         body: Option[typing.Any],
         files: Option[typing.Mapping[str, MultipartFile]],
+        auth: typing.Any = None,
     ) -> Result[typing.Any, APIError[typing.Any]]:
         import rnet
         import rnet.exceptions
@@ -65,6 +67,8 @@ class RnetClient(BaseClient):
                 "query": self.query_parameters.copy(),
                 "cookies": self.cookies.copy(),
             }
+
+            self._apply_auth(auth, kwargs["headers"], kwargs["query"], kwargs["cookies"])
 
             if headers:
                 kwargs["headers"] |= {k.title(): v if isinstance(v, str) else encoder.encode(v).strip('"') for k, v in headers.unwrap().items()}
@@ -114,7 +118,7 @@ class RnetClient(BaseClient):
 
             request_id = resp.headers.get("x-request-id") or resp.headers.get("request-id")
             request_id = None if not request_id else request_id.decode()
-            return self.to_api_error(
+            return self._to_api_error(
                 path,
                 method,
                 status=HTTPStatus(resp.status.as_int()),
@@ -140,6 +144,15 @@ class RnetClient(BaseClient):
                     NetworkError("RNET network error occurred", error),
                     method,
                     status=HTTPStatus.BAD_REQUEST,
+                    path=path,
+                ),
+            )
+        except AuthError as error:
+            return Error(
+                APIError(
+                    error,
+                    method,
+                    status=HTTPStatus.FORBIDDEN,
                     path=path,
                 ),
             )

@@ -1,4 +1,5 @@
 from saronia.api import *
+from saronia.auth import *
 from saronia.client import *
 from saronia.controller import *
 from saronia.error import *

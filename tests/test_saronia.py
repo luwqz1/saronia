@@ -1264,7 +1264,7 @@ class TestSecurity:
     def test_header_api_key(self):
         key = HeaderAPIKey["X-API-Key"]("secret")
         assert key.name == "X-API-Key"
-        assert key.key == "secret"
+        assert key.value == "secret"
         assert key.mapping == {"X-API-Key": "secret"}
 
     def test_query_api_key(self):

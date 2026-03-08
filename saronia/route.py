@@ -64,6 +64,25 @@ APIResult = kungfu.Result
 
 _PATH_PARAM_RE: typing.Final = re.compile(r"{([a-zA-Z_][a-zA-Z0-9_]*)}")
 _NORESPONSE: typing.Final = object()
+_NOAUTH: typing.Final = object()
+
+
+def _resolve_auth(controller_auth: typing.Any, method_auth: typing.Any) -> typing.Any:
+    if method_auth is None:
+        return None
+
+    if method_auth is _NOAUTH:
+        return controller_auth
+
+    if controller_auth is None:
+        return method_auth
+
+    from saronia.auth import AuthComposite
+
+    if (isinstance(method_auth, AuthComposite) and method_auth.op == "AND") and (isinstance(method_auth.left, AuthComposite) and method_auth.left.op == "NOT"):
+        return method_auth.right
+
+    return AuthComposite("OR", controller_auth, method_auth)
 
 
 def _extract_path_param_names(path: str, /) -> set[str]:
@@ -71,12 +90,10 @@ def _extract_path_param_names(path: str, /) -> set[str]:
 
 
 def _to_header_name(name: str) -> str:
-    """Convert snake_case field name to HTTP Kebab-Case header (e.g. some_header → Some-Header)."""
     return "-".join(part.capitalize() for part in name.split("_"))
 
 
 def _to_x_header_name(name: str) -> str:
-    """Convert snake_case field name to X-Kebab-Case header (e.g. token → X-Token)."""
     return "X-" + "-".join(part.capitalize() for part in name.split("_"))
 
 
@@ -353,6 +370,7 @@ def route(
     form: type[msgspex.Model] | None = None,
     /,
     *,
+    auth: typing.Any = _NOAUTH,
     response: typing.Any = _NORESPONSE,
     path: bool = True,
     query: bool = False,
@@ -395,6 +413,8 @@ def route(
                 is_json=json,
             )
 
+        from saronia.api import _SARONIA_CONTROLLER_AUTH_ATTR
+
         @wraps(fn)
         async def wrapper(self: Controller, /, *args: typing.Any, **kwargs: typing.Any) -> typing.Any:
             if form_spec is None:
@@ -406,6 +426,8 @@ def route(
                 form=form_spec.form_model.from_data(*args, **kwargs),
                 form_spec=form_spec,
             )
+            controller_auth = getattr(type(self), _SARONIA_CONTROLLER_AUTH_ATTR, None)
+
             return await self.client.request(  # type: ignore
                 parsed.path,
                 method,
@@ -417,6 +439,7 @@ def route(
                 query_params=parsed.query_params,
                 body=parsed.body,
                 files=parsed.files,
+                auth=_resolve_auth(controller_auth, auth),
             )
 
         del fn, sig, resp, error

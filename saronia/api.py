@@ -1,12 +1,17 @@
 import typing
 
+import msgspex
+
 from saronia.client.abc import ABCClient
 from saronia.controller import Controller
 
 if typing.TYPE_CHECKING:
-    type AuthMethod[**P] = typing.Callable[P, typing.Any]
+    from saronia.auth import Auth
+
+    type AuthMethod[**P] = typing.Callable[P, msgspex.Model]
 
 _SARONIA_CONTROLLER_PATH_ATTR: typing.Final = "__saronia_controller_path__"
+_SARONIA_CONTROLLER_AUTH_ATTR: typing.Final = "__saronia_controller_auth__"
 
 
 def _join_path(base: str, path: str) -> str:
@@ -20,33 +25,36 @@ def _join_path(base: str, path: str) -> str:
 
 
 class API[**P = [], R = None]:
-    __slots__ = ("path", "controllers", "_auth_method", "_client")
+    __slots__ = ("path", "controllers", "_auth_model", "_client")
 
     path: str
     controllers: set[type[Controller]]
-    _auth_method: AuthMethod[P] | None
+    _auth_model: AuthMethod[P] | None
     _client: ABCClient | None
 
     def __init__(self, path: str, /) -> None:
         self.path = path
         self.controllers = set()
-        self._auth_method = None
+        self._auth_model = None
         self._client = None
 
-    def __call__[T](self, path: str, /) -> typing.Callable[[type[T]], type[T]]:
+    def __call__[T](self, path: str, /, *, auth: "Auth | type[Auth] | None" = None) -> typing.Callable[[type[T]], type[T]]:
         def register_controller(x: type[Controller], /) -> type[Controller]:
             setattr(x, "path", path)
             setattr(x, _SARONIA_CONTROLLER_PATH_ATTR, path)
+            setattr(x, _SARONIA_CONTROLLER_AUTH_ATTR, auth)
             self.controllers.add(x)
             return x
 
         return register_controller  # type: ignore
 
     def auth(self, *args: P.args, **kwargs: P.kwargs) -> None:
-        if self._auth_method is None:
-            raise TypeError("auth method is not defined")
+        if self._auth_model is None:
+            raise TypeError(
+                "Auth model is not defined, need to bind via `.bind_auth()` with a specific auth model.",
+            )
 
-        self.client.auth_security(self._auth_method(*args, **kwargs))
+        self.client.auth(self._auth_model(*args, **kwargs))
 
     def build(self, client: ABCClient, /) -> typing.Self:
         self._client = client
@@ -59,7 +67,7 @@ class API[**P = [], R = None]:
         return self
 
     def bind_auth[**Params](self, meth: AuthMethod[Params], /) -> API[Params]:
-        self._auth_method = meth  # type: ignore
+        self._auth_model = meth  # type: ignore
         return self  # type: ignore
 
     @classmethod

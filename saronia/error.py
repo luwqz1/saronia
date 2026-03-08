@@ -5,6 +5,9 @@ import typing
 from http import HTTPMethod, HTTPStatus
 from reprlib import recursive_repr
 
+if typing.TYPE_CHECKING:
+    from saronia.auth import AuthError
+
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class UnknownError:
@@ -68,7 +71,7 @@ class APIError[E = typing.Never](Exception):
 
     """
 
-    error: E | NetworkError | UnknownError
+    error: E | AuthError | NetworkError | UnknownError
 
     __match_args__ = ("error", "method", "status", "path", "request_id")
 

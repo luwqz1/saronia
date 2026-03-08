@@ -7,13 +7,14 @@ from http import HTTPMethod, HTTPStatus
 
 from kungfu import Error, Option, Result
 from msgspex import decoder
+from msgspex.model import Model
 
 from saronia.__meta__ import __version__
 from saronia.client.abc import ABCClient, MultipartFile
 from saronia.error import APIError, StatusError, UnknownError
-from saronia.security import APIKey, CookieAPIKey, HeaderAPIKey, HTTPAuthorization, QueryAPIKey
 
-type AuthMethod = APIKey | HTTPAuthorization
+if typing.TYPE_CHECKING:
+    from saronia.auth import Auth, AuthComposite
 
 DEFAULT_TIMEOUT: typing.Final = 30.0
 DEFAULT_USER_AGENT: typing.Final = "CPython/{py_major}.{py_minor}; ({system}; {platform}) {saronia} {http_client}".format(
@@ -26,32 +27,24 @@ DEFAULT_USER_AGENT: typing.Final = "CPython/{py_major}.{py_minor}; ({system}; {p
 )
 
 
-class BaseClient(ABCClient[AuthMethod], abc.ABC):
+class BaseClient(ABCClient, abc.ABC):
     base_url: str
     headers: dict[str, str]
     query_parameters: dict[str, str]
     cookies: dict[str, str]
+    auth_model: Model | None
 
     def __init__(self, user_agent: str, base_url: str = "") -> None:
         self.base_url = base_url
         self.headers = {"User-Agent": user_agent}
         self.query_parameters = {}
         self.cookies = {}
+        self.auth_model = None
 
-    def auth_security(self, auth_method: AuthMethod) -> None:
-        match auth_method:
-            case CookieAPIKey():
-                self.cookies.update(auth_method.mapping)
-            case HeaderAPIKey():
-                self.headers.update(auth_method.mapping)
-            case QueryAPIKey():
-                self.query_parameters.update(auth_method.mapping)
-            case HTTPAuthorization():
-                self.headers.update(auth_method.header)
-            case _:
-                raise NotImplementedError(f"No implementation found for `{auth_method!r}`")
+    def auth(self, auth_model: Model) -> None:
+        self.auth_model = auth_model
 
-    def to_api_error(
+    def _to_api_error(
         self,
         path: str,
         method: HTTPMethod,
@@ -71,6 +64,60 @@ class BaseClient(ABCClient[AuthMethod], abc.ABC):
 
         return Error(APIError(UnknownError(payload), method, status, path=path, request_id=request_id))
 
+    def _apply_auth(
+        self,
+        auth: "Auth | AuthComposite | None",
+        headers: dict[str, str],
+        query_params: dict[str, str],
+        cookies: dict[str, str],
+    ) -> None:
+        if auth is None:
+            return
+
+        from saronia.auth import AuthComposite, AuthError
+        from saronia.security import CookieAPIKey, HeaderAPIKey, HTTPAuthorization, QueryAPIKey
+
+        if isinstance(auth, type):
+            if self.auth_model is None:
+                raise AuthError(f"Auth {auth.__name__} required but no credentials provided")
+
+            for field_value in self.auth_model.to_dict().values():
+                if field_value is not None and isinstance(field_value, auth):
+                    auth = field_value
+                    break
+            else:
+                raise AuthError(f"Auth {auth.__name__} not found in auth model")
+
+        if isinstance(auth, AuthComposite):
+            match auth.op:
+                case "AND":
+                    self._apply_auth(auth.left, headers, query_params, cookies)
+                    self._apply_auth(auth.right, headers, query_params, cookies)
+                case "OR":
+                    try:
+                        self._apply_auth(auth.left, headers, query_params, cookies)
+                        return
+                    except AuthError:
+                        self._apply_auth(auth.right, headers, query_params, cookies)
+                case "NOT":
+                    raise AuthError("NOT operator requires combination with other auth")
+                case _:
+                    typing.assert_never(auth.op)
+
+            return
+
+        match auth:
+            case CookieAPIKey():
+                cookies.update(auth.mapping)
+            case HeaderAPIKey():
+                headers.update(auth.mapping)
+            case QueryAPIKey():
+                query_params.update(auth.mapping)
+            case HTTPAuthorization():
+                headers.update(auth.header)
+            case _:
+                raise AuthError(f"Unknown auth type: `{type(auth)}`")
+
     @abc.abstractmethod
     async def request(
         self,
@@ -85,6 +132,7 @@ class BaseClient(ABCClient[AuthMethod], abc.ABC):
         query_params: Option[typing.Mapping[str, typing.Any]],
         body: Option[typing.Any],
         files: Option[typing.Mapping[str, MultipartFile]],
+        auth: typing.Any = None,
     ) -> Result[typing.Any, APIError[typing.Any]]:
         pass
 

@@ -3,6 +3,7 @@ import typing
 from http import HTTPMethod
 
 from kungfu import Option, Result
+from msgspex.model import Model
 
 from saronia.error import APIError
 
@@ -24,9 +25,9 @@ class MultipartFile(typing.NamedTuple):
     mime: str | None = None
 
 
-class ABCClient[T = typing.Any](abc.ABC):
+class ABCClient(abc.ABC):
     @abc.abstractmethod
-    def auth_security(self, auth_method: T) -> None:
+    def auth(self, auth_model: Model) -> None:
         pass
 
     @abc.abstractmethod
@@ -43,6 +44,7 @@ class ABCClient[T = typing.Any](abc.ABC):
         query_params: Option[typing.Mapping[str, typing.Any]],
         body: Option[typing.Any],
         files: Option[typing.Mapping[str, MultipartFile]],
+        auth: typing.Any = None,
     ) -> Result[typing.Any, APIError[typing.Any]]:
         pass
 

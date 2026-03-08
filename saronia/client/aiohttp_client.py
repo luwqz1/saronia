@@ -7,6 +7,7 @@ from kungfu import Error, Ok, Option, Result
 from kungfu.library.monad.option import NOTHING
 from msgspex import decoder, encoder
 
+from saronia.auth import AuthError
 from saronia.client.base import DEFAULT_USER_AGENT, BaseClient, MultipartFile
 from saronia.error import APIError, NetworkError, UnknownError
 
@@ -44,6 +45,7 @@ class AiohttpClient(BaseClient):
         query_params: Option[typing.Mapping[str, typing.Any]],
         body: Option[typing.Any],
         files: Option[typing.Mapping[str, MultipartFile]],
+        auth: typing.Any = None,
     ) -> Result[typing.Any, APIError[typing.Any]]:
         import aiohttp
         import aiohttp.client_exceptions
@@ -53,8 +55,10 @@ class AiohttpClient(BaseClient):
             kwargs: dict[str, typing.Any] = {
                 "headers": self.headers.copy(),
                 "params": self.query_parameters.copy(),
-                "cookies": self.cookies,
+                "cookies": self.cookies.copy(),
             }
+
+            self._apply_auth(auth, kwargs["headers"], kwargs["params"], kwargs["cookies"])
 
             if headers:
                 kwargs["headers"] = {k.title(): v if isinstance(v, str) else encoder.encode(v).strip('"') for k, v in headers.unwrap().items()}
@@ -90,7 +94,7 @@ class AiohttpClient(BaseClient):
                 if 200 <= resp.status < 300:
                     return Ok(decoder.decode(await resp.read(), type=response_type.unwrap_or(typing.Any)))
 
-                return self.to_api_error(
+                return self._to_api_error(
                     path,
                     method,
                     status=HTTPStatus(resp.status),
@@ -106,6 +110,15 @@ class AiohttpClient(BaseClient):
                     NetworkError("AIOHTTP network error occurred", error),
                     method,
                     status=HTTPStatus.BAD_REQUEST,
+                    path=path,
+                ),
+            )
+        except AuthError as error:
+            return Error(
+                APIError(
+                    error,
+                    method,
+                    status=HTTPStatus.FORBIDDEN,
                     path=path,
                 ),
             )

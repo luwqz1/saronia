@@ -2,10 +2,12 @@ import base64
 import dataclasses
 import typing
 
+from saronia.auth import AuthComposite, AuthCompositeMeta
+
 
 @dataclasses.dataclass(slots=True, repr=False)
-class APIKey:
-    key: str
+class APIKey(metaclass=AuthCompositeMeta):
+    value: str
     name: str = dataclasses.field(init=False)
 
     def __class_getitem__(cls, name: str, /) -> typing.Any:
@@ -20,17 +22,35 @@ class APIKey:
 
     @property
     def mapping(self) -> typing.Mapping[str, str]:
-        return {self.name: self.key}
+        return {self.name: self.value}
+
+    def __or__(self, other: typing.Any) -> AuthComposite:
+        return AuthComposite("OR", self, other)
+
+    def __and__(self, other: typing.Any) -> AuthComposite:
+        return AuthComposite("AND", self, other)
+
+    def __invert__(self) -> AuthComposite:
+        return AuthComposite("NOT", self, None)
 
 
 @dataclasses.dataclass(slots=True, repr=False)
-class HTTPAuthorization:
+class HTTPAuthorization(metaclass=AuthCompositeMeta):
     credentials: str
     scheme: str
 
     @property
     def header(self) -> typing.Mapping[str, str]:
         return {"Authorization": f"{self.scheme} {self.credentials}"}
+
+    def __or__(self, other: typing.Any) -> AuthComposite:
+        return AuthComposite("OR", self, other)
+
+    def __and__(self, other: typing.Any) -> AuthComposite:
+        return AuthComposite("AND", self, other)
+
+    def __invert__(self) -> AuthComposite:
+        return AuthComposite("NOT", self, None)
 
 
 @dataclasses.dataclass(slots=True, repr=False)
