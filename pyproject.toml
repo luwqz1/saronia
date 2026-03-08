@@ -1,3 +1,7 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
 [project]
 name = "saronia"
 description = "A lightweight, spec-driven builder for API clients and controllers."
