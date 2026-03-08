@@ -1,5 +1,6 @@
 # pyright: reportAttributeAccessIssue=false, reportMissingImports=false
 
+import datetime
 import typing
 from http import HTTPMethod, HTTPStatus
 from io import IOBase
@@ -7,19 +8,37 @@ from io import IOBase
 from kungfu import Error, Ok, Option, Result
 from msgspex import decoder, encoder
 
-from saronia.client.abc import ABCClient, MultipartFile
+from saronia.client.base import DEFAULT_TIMEOUT, DEFAULT_USER_AGENT, BaseClient, MultipartFile
 from saronia.error import APIError, NetworkError, UnknownError
 
 if typing.TYPE_CHECKING:
     import rnet
 
 
-class RnetClient(ABCClient):
-    __slots__ = ("_client", "_base_url")
+class RnetClient(BaseClient):
+    def __init__(
+        self,
+        client: "rnet.Client",
+        base_url: str = "",
+        *,
+        user_agent: str | None = None,
+        request_timeout: datetime.timedelta | float = DEFAULT_TIMEOUT,
+        default_headers: bool = False,
+    ) -> None:
+        super().__init__(
+            user_agent=user_agent or DEFAULT_USER_AGENT.format(http_client="rnet3"),
+            base_url=base_url.rstrip("/"),
+        )
 
-    def __init__(self, client: "rnet.Client", base_url: str = "") -> None:
-        self._client = client
-        self._base_url = base_url.rstrip("/")
+        self.client = client
+        self.default_headers = default_headers
+        self.request_timeout = (
+            request_timeout
+            if request_timeout is None
+            else datetime.timedelta(seconds=request_timeout)
+            if isinstance(request_timeout, int | float)
+            else request_timeout
+        )
 
     async def request(
         self,
@@ -38,24 +57,24 @@ class RnetClient(ABCClient):
         import rnet
         import rnet.exceptions
 
-        url = f"{self._base_url}{path}" if self._base_url else path
+        url = f"{self.base_url}{path}" if self.base_url else path
 
         try:
-            kwargs: dict[str, typing.Any] = {}
+            kwargs: dict[str, typing.Any] = {
+                "headers": self.headers.copy(),
+                "query": self.query_parameters.copy(),
+                "cookies": self.cookies.copy(),
+            }
 
             if headers:
-                kwargs["headers"] = {k: v if isinstance(v, str) else encoder.encode(v).strip('"') for k, v in headers.unwrap().items()}
+                kwargs["headers"] |= {k.title(): v if isinstance(v, str) else encoder.encode(v).strip('"') for k, v in headers.unwrap().items()}
 
             if query_params:
-                kwargs["query"] = {k: v if isinstance(v, str) else encoder.encode(v).strip('"') for k, v in query_params.unwrap().items()}
+                kwargs["query"] |= {k: v if isinstance(v, str | int | float | bool) else encoder.encode(v).strip('"') for k, v in query_params.unwrap().items()}
 
             if json:
                 json_data = json.unwrap()
-                ct_header = {"Content-Type": "application/json"}
-                if "headers" in kwargs:
-                    kwargs["headers"].update(ct_header)
-                else:
-                    kwargs["headers"] = ct_header
+                kwargs["headers"]["Content-Type"] = "application/json"
                 kwargs["body"] = json_data if isinstance(json_data, bytes) else json_data.encode()
             elif body:
                 kwargs["body"] = body.unwrap()
@@ -82,28 +101,29 @@ class RnetClient(ABCClient):
 
                 kwargs["multipart"] = rnet.Multipart(*parts)
 
-            resp = await self._client.request(getattr(rnet.Method, method.name), url, **kwargs)
-            status = HTTPStatus(resp.status.as_int())
+            resp = await self.client.request(
+                getattr(rnet.Method, method.name),
+                url,
+                default_headers=self.default_headers,
+                timeout=self.request_timeout,
+                **kwargs,
+            )
 
             if 200 <= resp.status.as_int() < 300:
                 return Ok(decoder.decode(await resp.bytes(), type=response_type.unwrap_or(typing.Any)))
 
-            error_data = await resp.bytes()
             request_id = resp.headers.get("x-request-id") or resp.headers.get("request-id")
             request_id = None if not request_id else request_id.decode()
-
-            if not error_data:
-                return Error(APIError(UnknownError(error_data), method, status, path=path, request_id=request_id))
-
-            for error_type in errors:
-                try:
-                    error_obj = decoder.decode(error_data, type=error_type)
-                    return Error(APIError(error_obj, method, status, path=path, request_id=request_id))
-                except Exception:
-                    continue
-
-            return Error(APIError(UnknownError(error_data), method, status, path=path, request_id=request_id))
-
+            return self.to_api_error(
+                path,
+                method,
+                status=HTTPStatus(resp.status.as_int()),
+                payload=await resp.bytes(),
+                errors=errors,
+                request_id=request_id,
+            )
+        except SystemExit, KeyboardInterrupt:
+            raise
         except (
             rnet.exceptions.ConnectionError,
             rnet.exceptions.ConnectionResetError,
@@ -117,7 +137,16 @@ class RnetClient(ABCClient):
         ) as error:
             return Error(
                 APIError(
-                    NetworkError("Rnet network error occurred", error),
+                    NetworkError("RNET network error occurred", error),
+                    method,
+                    status=HTTPStatus.BAD_REQUEST,
+                    path=path,
+                ),
+            )
+        except BaseException as exc:
+            return Error(
+                APIError(
+                    UnknownError(b"", orig_error=exc),
                     method,
                     status=HTTPStatus.BAD_REQUEST,
                     path=path,

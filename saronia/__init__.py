@@ -4,3 +4,4 @@ from saronia.controller import *
 from saronia.error import *
 from saronia.parameters import *
 from saronia.route import *
+from saronia.security import *

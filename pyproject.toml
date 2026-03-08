@@ -1,12 +1,12 @@
 [project]
 name = "saronia"
-version = "1.0.0"
 description = "A lightweight, spec-driven builder for API clients and controllers."
 readme = "README.md"
 authors = [{ name = "luwqz1", email = "howluwqz1@gmail.com" }]
 license = { file = "LICENSE" }
 maintainers = [{ name = "luwqz1", email = "howluwqz1@gmail.com" }]
 requires-python = ">=3.14"
+dynamic = ["version"]
 keywords = [
   "async",
   "msgspex",
@@ -40,7 +40,7 @@ aiohttp = ["aiohttp"]
 
 [dependency-groups]
 dev = [
-    "ruff>=0.15.4,<1",
+    "ruff>=0.15.5,<1",
     "basedpyright>=1.38.2,<2",
     "pre-commit>=4.5.1,<5",
     "pytest>=9.0.2",
@@ -59,6 +59,9 @@ Source = "https://github.com/luwqz1/saronia"
 
 [tool.uv]
 package = true
+
+[tool.hatch.version]
+path = "saronia/__meta__.py"
 
 [tool.ruff]
 line-length = 160

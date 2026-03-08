@@ -24,7 +24,11 @@ class MultipartFile(typing.NamedTuple):
     mime: str | None = None
 
 
-class ABCClient(abc.ABC):
+class ABCClient[T = typing.Any](abc.ABC):
+    @abc.abstractmethod
+    def auth_security(self, auth_method: T) -> None:
+        pass
+
     @abc.abstractmethod
     async def request(
         self,

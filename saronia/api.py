@@ -3,27 +3,34 @@ import typing
 from saronia.client.abc import ABCClient
 from saronia.controller import Controller
 
+if typing.TYPE_CHECKING:
+    type AuthMethod[**P] = typing.Callable[P, typing.Any]
+
 _SARONIA_CONTROLLER_PATH_ATTR: typing.Final = "__saronia_controller_path__"
 
 
 def _join_path(base: str, path: str) -> str:
     if not base:
         return path
+
     if not path:
         return base
+
     return f"{base.rstrip('/')}/{path.lstrip('/')}"
 
 
-class API:
-    __slots__ = ("path", "controllers", "_client")
+class API[**P = [], R = None]:
+    __slots__ = ("path", "controllers", "_auth_method", "_client")
 
     path: str
     controllers: set[type[Controller]]
+    _auth_method: AuthMethod[P] | None
     _client: ABCClient | None
 
     def __init__(self, path: str, /) -> None:
         self.path = path
         self.controllers = set()
+        self._auth_method = None
         self._client = None
 
     def __call__[T](self, path: str, /) -> typing.Callable[[type[T]], type[T]]:
@@ -35,6 +42,12 @@ class API:
 
         return register_controller  # type: ignore
 
+    def auth(self, *args: P.args, **kwargs: P.kwargs) -> None:
+        if self._auth_method is None:
+            raise TypeError("auth method is not defined")
+
+        self.client.auth_security(self._auth_method(*args, **kwargs))
+
     def build(self, client: ABCClient, /) -> typing.Self:
         self._client = client
 
@@ -44,6 +57,10 @@ class API:
             setattr(controller, "path", _join_path(self.path, original_path))
 
         return self
+
+    def bind_auth[**Params](self, meth: AuthMethod[Params], /) -> API[Params]:
+        self._auth_method = meth  # type: ignore
+        return self  # type: ignore
 
     @classmethod
     def endpoint(cls, path: str, /) -> typing.Self:

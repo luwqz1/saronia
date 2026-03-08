@@ -7,19 +7,29 @@ from kungfu import Error, Ok, Option, Result
 from kungfu.library.monad.option import NOTHING
 from msgspex import decoder, encoder
 
-from saronia.client.abc import ABCClient, MultipartFile
+from saronia.client.base import DEFAULT_USER_AGENT, BaseClient, MultipartFile
 from saronia.error import APIError, NetworkError, UnknownError
 
 if typing.TYPE_CHECKING:
     import aiohttp
 
 
-class AiohttpClient(ABCClient):
-    __slots__ = ("_session", "_base_url")
+class AiohttpClient(BaseClient):
+    def __init__(
+        self,
+        session: "aiohttp.ClientSession",
+        *,
+        user_agent: str | None = None,
+        request_timeout: float | None = None,
+    ) -> None:
+        from aiohttp import __version__
 
-    def __init__(self, session: "aiohttp.ClientSession", base_url: str = "") -> None:
-        self._session = session
-        self._base_url = base_url.rstrip("/")
+        super().__init__(
+            user_agent=user_agent or DEFAULT_USER_AGENT.format(http_client=f"aiohttp/{__version__}"),
+        )
+
+        self.session = session
+        self.request_timeout = request_timeout
 
     async def request(
         self,
@@ -39,24 +49,22 @@ class AiohttpClient(ABCClient):
         import aiohttp.client_exceptions
         import aiohttp.http_exceptions
 
-        url = f"{self._base_url}{path}" if self._base_url else path
-
         try:
-            kwargs: dict[str, typing.Any] = {}
+            kwargs: dict[str, typing.Any] = {
+                "headers": self.headers.copy(),
+                "params": self.query_parameters.copy(),
+                "cookies": self.cookies,
+            }
 
             if headers:
-                kwargs["headers"] = {k: str(v) for k, v in headers.unwrap().items()}
+                kwargs["headers"] = {k.title(): v if isinstance(v, str) else encoder.encode(v).strip('"') for k, v in headers.unwrap().items()}
 
             if query_params:
-                kwargs["params"] = {k: str(v) for k, v in query_params.unwrap().items()}
+                kwargs["params"] = {k: v if isinstance(v, str | int | float | bool) else encoder.encode(v).strip('"') for k, v in query_params.unwrap().items()}
 
             if json:
                 json_data = json.unwrap()
-                ct_header = {"Content-Type": "application/json"}
-                if "headers" in kwargs:
-                    kwargs["headers"].update(ct_header)
-                else:
-                    kwargs["headers"] = ct_header
+                kwargs["headers"]["Content-Type"] = "application/json"
                 kwargs["data"] = json_data if isinstance(json_data, bytes) else json_data.encode()
             elif body is not NOTHING:
                 kwargs["data"] = body.unwrap()
@@ -78,31 +86,33 @@ class AiohttpClient(ABCClient):
 
                 kwargs["data"] = form_data
 
-            async with self._session.request(method.value, url, **kwargs) as resp:
-                status = HTTPStatus(resp.status)
-
+            async with self.session.request(method.value, path, **kwargs) as resp:
                 if 200 <= resp.status < 300:
                     return Ok(decoder.decode(await resp.read(), type=response_type.unwrap_or(typing.Any)))
 
-                error_data = await resp.read()
-                request_id = resp.headers.get("X-Request-ID") or resp.headers.get("Request-ID")
-
-                if not error_data:
-                    return Error(APIError(UnknownError(error_data), method, status, path=path, request_id=request_id))
-
-                for error_type in errors:
-                    try:
-                        error_obj = decoder.decode(error_data, type=error_type)
-                        return Error(APIError(error_obj, method, status, path=path, request_id=request_id))
-                    except Exception:
-                        continue
-
-                return Error(APIError(UnknownError(error_data), method, status, path=path, request_id=request_id))
-
+                return self.to_api_error(
+                    path,
+                    method,
+                    status=HTTPStatus(resp.status),
+                    payload=await resp.read(),
+                    errors=errors,
+                    request_id=resp.headers.get("X-Request-ID") or resp.headers.get("Request-ID"),
+                )
+        except SystemExit, KeyboardInterrupt:
+            raise
         except (aiohttp.client_exceptions.ClientError, aiohttp.http_exceptions.HttpProcessingError) as error:
             return Error(
                 APIError(
                     NetworkError("AIOHTTP network error occurred", error),
+                    method,
+                    status=HTTPStatus.BAD_REQUEST,
+                    path=path,
+                ),
+            )
+        except BaseException as exc:
+            return Error(
+                APIError(
+                    UnknownError(b"", orig_error=exc),
                     method,
                     status=HTTPStatus.BAD_REQUEST,
                     path=path,

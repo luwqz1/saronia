@@ -1,6 +1,7 @@
 """Comprehensive tests for saronia using a real FastAPI server.
 Tests both AiohttpClient and RnetClient across all parameter types and error scenarios."""
 
+import base64
 import io
 import threading
 import time
@@ -16,7 +17,7 @@ from fastapi.responses import JSONResponse, Response
 from msgspex import Model
 
 import saronia
-from saronia import API, AiohttpClient, RnetClient, delete, get, patch, post, put
+from saronia import API, AiohttpClient, APIResult, RnetClient, delete, get, patch, post, put
 from saronia.error import UnknownError
 from saronia.parameters import (
     JSON,
@@ -34,6 +35,13 @@ from saronia.parameters import (
 )
 from saronia.parameters import (
     XHeader as SXHeader,
+)
+from saronia.security import (
+    CookieAPIKey,
+    HeaderAPIKey,
+    HTTPBasic,
+    HTTPBearer,
+    QueryAPIKey,
 )
 
 app = FastAPI()
@@ -255,7 +263,7 @@ class AiohttpItemsController:
     async def get_item(
         self,
         item_id: SPath[int],
-    ) -> kungfu.Result[ItemResponse, ErrorMessage]: ...
+    ) -> APIResult[ItemResponse, ErrorMessage]: ...
 
     @get("/{item_id}")
     async def get_item_with_query(
@@ -263,14 +271,14 @@ class AiohttpItemsController:
         item_id: SPath[int],
         q: SQuery[str],
         tag: SQuery[str],
-    ) -> kungfu.Result[ItemResponse, ErrorMessage]: ...
+    ) -> APIResult[ItemResponse, ErrorMessage]: ...
 
     @get("")
     async def list_items(
         self,
         limit: SQuery[int] = 10,
         offset: SQuery[int] = 0,
-    ) -> kungfu.Result[ListResponse, ErrorMessage]: ...
+    ) -> APIResult[ListResponse, ErrorMessage]: ...
 
     @get("")
     async def list_items_with_search(
@@ -278,7 +286,7 @@ class AiohttpItemsController:
         limit: SQuery[int],
         offset: SQuery[int],
         search: SQuery[str],
-    ) -> kungfu.Result[ListResponse, ErrorMessage]: ...
+    ) -> APIResult[ListResponse, ErrorMessage]: ...
 
     @post("")
     async def create_item(
@@ -286,7 +294,7 @@ class AiohttpItemsController:
         name: JSON[str],
         price: JSON[float],
         in_stock: JSON[bool],
-    ) -> kungfu.Result[CreateItemResponse, ErrorMessage]: ...
+    ) -> APIResult[CreateItemResponse, ErrorMessage]: ...
 
     @put("/{item_id}")
     async def update_item(
@@ -294,20 +302,20 @@ class AiohttpItemsController:
         item_id: SPath[int],
         name: JSON[str],
         price: JSON[float],
-    ) -> kungfu.Result[UpdateItemResponse, ErrorMessage]: ...
+    ) -> APIResult[UpdateItemResponse, ErrorMessage]: ...
 
     @patch("/{item_id}")
     async def patch_item(
         self,
         item_id: SPath[int],
         name: JSON[str],
-    ) -> kungfu.Result[PatchItemResponse, ErrorMessage]: ...
+    ) -> APIResult[PatchItemResponse, ErrorMessage]: ...
 
     @delete("/{item_id}")
     async def delete_item(
         self,
         item_id: SPath[int],
-    ) -> kungfu.Result[DeleteResponse, ErrorMessage]: ...
+    ) -> APIResult[DeleteResponse, ErrorMessage]: ...
 
 
 aiohttp_headers_api = API.endpoint("")
@@ -320,7 +328,7 @@ class AiohttpHeadersController:
         self,
         x_token: SHeader[str],
         x_user_id: SHeader[str],
-    ) -> kungfu.Result[HeadersResponse, ErrorMessage]: ...
+    ) -> APIResult[HeadersResponse, ErrorMessage]: ...
 
 
 aiohttp_xheaders_api = API.endpoint("")
@@ -333,7 +341,7 @@ class AiohttpXHeadersController:
         self,
         token: SXHeader[str],
         correlation_id: SXHeader[str],
-    ) -> kungfu.Result[XHeadersResponse, ErrorMessage]: ...
+    ) -> APIResult[XHeadersResponse, ErrorMessage]: ...
 
 
 aiohttp_form_api = API.endpoint("")
@@ -346,7 +354,7 @@ class AiohttpFormController:
         self,
         username: URLencoded[str],
         password: URLencoded[str],
-    ) -> kungfu.Result[FormResponse, ErrorMessage]: ...
+    ) -> APIResult[FormResponse, ErrorMessage]: ...
 
 
 aiohttp_upload_api = API.endpoint("")
@@ -359,7 +367,7 @@ class AiohttpUploadController:
         self,
         file: FileBuffer,
         description: URLencoded[str] = "",
-    ) -> kungfu.Result[UploadResponse, ErrorMessage]: ...
+    ) -> APIResult[UploadResponse, ErrorMessage]: ...
 
 
 aiohttp_errors_api = API.endpoint("/errors")
@@ -368,19 +376,19 @@ aiohttp_errors_api = API.endpoint("/errors")
 @aiohttp_errors_api("")
 class AiohttpErrorsController:
     @get("/400")
-    async def get_400(self) -> kungfu.Result[None, ErrorMessage]: ...
+    async def get_400(self) -> APIResult[None, ErrorMessage]: ...
 
     @get("/404")
-    async def get_404(self) -> kungfu.Result[None, ErrorMessage]: ...
+    async def get_404(self) -> APIResult[None, ErrorMessage]: ...
 
     @get("/422")
-    async def get_422(self) -> kungfu.Result[None, ErrorDetail]: ...
+    async def get_422(self) -> APIResult[None, ErrorDetail]: ...
 
     @get("/500")
-    async def get_500(self) -> kungfu.Result[None, ErrorMessage]: ...
+    async def get_500(self) -> APIResult[None, ErrorMessage]: ...
 
     @get("/empty")
-    async def get_empty(self) -> kungfu.Result[None, ErrorMessage]: ...
+    async def get_empty(self) -> APIResult[None, ErrorMessage]: ...
 
 
 aiohttp_misc_api = API.endpoint("")
@@ -389,7 +397,7 @@ aiohttp_misc_api = API.endpoint("")
 @aiohttp_misc_api("/request-id")
 class AiohttpMiscController:
     @get("")
-    async def get_with_request_id(self) -> kungfu.Result[OkResponse, ErrorMessage]: ...
+    async def get_with_request_id(self) -> APIResult[OkResponse, ErrorMessage]: ...
 
 
 rnet_api = API.endpoint("")
@@ -401,7 +409,7 @@ class RnetItemsController:
     async def get_item(
         self,
         item_id: SPath[int],
-    ) -> kungfu.Result[ItemResponse, ErrorMessage]: ...
+    ) -> APIResult[ItemResponse, ErrorMessage]: ...
 
     @get("/{item_id}")
     async def get_item_with_query(
@@ -409,14 +417,14 @@ class RnetItemsController:
         item_id: SPath[int],
         q: SQuery[str],
         tag: SQuery[str],
-    ) -> kungfu.Result[ItemResponse, ErrorMessage]: ...
+    ) -> APIResult[ItemResponse, ErrorMessage]: ...
 
     @get("")
     async def list_items(
         self,
         limit: SQuery[int] = 10,
         offset: SQuery[int] = 0,
-    ) -> kungfu.Result[ListResponse, ErrorMessage]: ...
+    ) -> APIResult[ListResponse, ErrorMessage]: ...
 
     @get("")
     async def list_items_with_search(
@@ -424,7 +432,7 @@ class RnetItemsController:
         limit: SQuery[int],
         offset: SQuery[int],
         search: SQuery[str],
-    ) -> kungfu.Result[ListResponse, ErrorMessage]: ...
+    ) -> APIResult[ListResponse, ErrorMessage]: ...
 
     @post("")
     async def create_item(
@@ -432,7 +440,7 @@ class RnetItemsController:
         name: JSON[str],
         price: JSON[float],
         in_stock: JSON[bool],
-    ) -> kungfu.Result[CreateItemResponse, ErrorMessage]: ...
+    ) -> APIResult[CreateItemResponse, ErrorMessage]: ...
 
     @put("/{item_id}")
     async def update_item(
@@ -440,20 +448,20 @@ class RnetItemsController:
         item_id: SPath[int],
         name: JSON[str],
         price: JSON[float],
-    ) -> kungfu.Result[UpdateItemResponse, ErrorMessage]: ...
+    ) -> APIResult[UpdateItemResponse, ErrorMessage]: ...
 
     @patch("/{item_id}")
     async def patch_item(
         self,
         item_id: SPath[int],
         name: JSON[str],
-    ) -> kungfu.Result[PatchItemResponse, ErrorMessage]: ...
+    ) -> APIResult[PatchItemResponse, ErrorMessage]: ...
 
     @delete("/{item_id}")
     async def delete_item(
         self,
         item_id: SPath[int],
-    ) -> kungfu.Result[DeleteResponse, ErrorMessage]: ...
+    ) -> APIResult[DeleteResponse, ErrorMessage]: ...
 
 
 rnet_headers_api = API.endpoint("")
@@ -466,7 +474,7 @@ class RnetHeadersController:
         self,
         x_token: SHeader[str],
         x_user_id: SHeader[str],
-    ) -> kungfu.Result[HeadersResponse, ErrorMessage]: ...
+    ) -> APIResult[HeadersResponse, ErrorMessage]: ...
 
 
 rnet_xheaders_api = API.endpoint("")
@@ -479,7 +487,7 @@ class RnetXHeadersController:
         self,
         token: SXHeader[str],
         correlation_id: SXHeader[str],
-    ) -> kungfu.Result[XHeadersResponse, ErrorMessage]: ...
+    ) -> APIResult[XHeadersResponse, ErrorMessage]: ...
 
 
 rnet_form_api = API.endpoint("")
@@ -492,7 +500,7 @@ class RnetFormController:
         self,
         username: URLencoded[str],
         password: URLencoded[str],
-    ) -> kungfu.Result[FormResponse, ErrorMessage]: ...
+    ) -> APIResult[FormResponse, ErrorMessage]: ...
 
 
 rnet_upload_api = API.endpoint("")
@@ -505,7 +513,7 @@ class RnetUploadController:
         self,
         file: FileBuffer,
         description: URLencoded[str] = "",
-    ) -> kungfu.Result[UploadResponse, ErrorMessage]: ...
+    ) -> APIResult[UploadResponse, ErrorMessage]: ...
 
 
 rnet_errors_api = API.endpoint("/errors")  # base prefix is prepended to controller path on build()
@@ -514,19 +522,19 @@ rnet_errors_api = API.endpoint("/errors")  # base prefix is prepended to control
 @rnet_errors_api("")
 class RnetErrorsController:
     @get("/400")
-    async def get_400(self) -> kungfu.Result[None, ErrorMessage]: ...
+    async def get_400(self) -> APIResult[None, ErrorMessage]: ...
 
     @get("/404")
-    async def get_404(self) -> kungfu.Result[None, ErrorMessage]: ...
+    async def get_404(self) -> APIResult[None, ErrorMessage]: ...
 
     @get("/422")
-    async def get_422(self) -> kungfu.Result[None, ErrorDetail]: ...
+    async def get_422(self) -> APIResult[None, ErrorDetail]: ...
 
     @get("/500")
-    async def get_500(self) -> kungfu.Result[None, ErrorMessage]: ...
+    async def get_500(self) -> APIResult[None, ErrorMessage]: ...
 
     @get("/empty")
-    async def get_empty(self) -> kungfu.Result[None, ErrorMessage]: ...
+    async def get_empty(self) -> APIResult[None, ErrorMessage]: ...
 
 
 rnet_misc_api = API.endpoint("")
@@ -535,15 +543,15 @@ rnet_misc_api = API.endpoint("")
 @rnet_misc_api("/request-id")
 class RnetMiscController:
     @get("")
-    async def get_with_request_id(self) -> kungfu.Result[OkResponse, ErrorMessage]: ...
+    async def get_with_request_id(self) -> APIResult[OkResponse, ErrorMessage]: ...
 
 
 @pytest_asyncio.fixture
 async def aiohttp_items():
     import aiohttp
 
-    async with aiohttp.ClientSession() as session:
-        aiohttp_api.build(AiohttpClient(session, base_url=BASE_URL))
+    async with aiohttp.ClientSession(base_url=BASE_URL) as session:
+        aiohttp_api.build(AiohttpClient(session))
         yield AiohttpItemsController()
 
 
@@ -551,8 +559,8 @@ async def aiohttp_items():
 async def aiohttp_headers():
     import aiohttp
 
-    async with aiohttp.ClientSession() as session:
-        aiohttp_headers_api.build(AiohttpClient(session, base_url=BASE_URL))
+    async with aiohttp.ClientSession(base_url=BASE_URL) as session:
+        aiohttp_headers_api.build(AiohttpClient(session))
         yield AiohttpHeadersController()
 
 
@@ -560,8 +568,8 @@ async def aiohttp_headers():
 async def aiohttp_xheaders():
     import aiohttp
 
-    async with aiohttp.ClientSession() as session:
-        aiohttp_xheaders_api.build(AiohttpClient(session, base_url=BASE_URL))
+    async with aiohttp.ClientSession(base_url=BASE_URL) as session:
+        aiohttp_xheaders_api.build(AiohttpClient(session))
         yield AiohttpXHeadersController()
 
 
@@ -569,8 +577,8 @@ async def aiohttp_xheaders():
 async def aiohttp_form():
     import aiohttp
 
-    async with aiohttp.ClientSession() as session:
-        aiohttp_form_api.build(AiohttpClient(session, base_url=BASE_URL))
+    async with aiohttp.ClientSession(base_url=BASE_URL) as session:
+        aiohttp_form_api.build(AiohttpClient(session))
         yield AiohttpFormController()
 
 
@@ -578,8 +586,8 @@ async def aiohttp_form():
 async def aiohttp_upload():
     import aiohttp
 
-    async with aiohttp.ClientSession() as session:
-        aiohttp_upload_api.build(AiohttpClient(session, base_url=BASE_URL))
+    async with aiohttp.ClientSession(base_url=BASE_URL) as session:
+        aiohttp_upload_api.build(AiohttpClient(session))
         yield AiohttpUploadController()
 
 
@@ -587,8 +595,8 @@ async def aiohttp_upload():
 async def aiohttp_errors():
     import aiohttp
 
-    async with aiohttp.ClientSession() as session:
-        aiohttp_errors_api.build(AiohttpClient(session, base_url=BASE_URL))
+    async with aiohttp.ClientSession(base_url=BASE_URL) as session:
+        aiohttp_errors_api.build(AiohttpClient(session))
         yield AiohttpErrorsController()
 
 
@@ -596,8 +604,8 @@ async def aiohttp_errors():
 async def aiohttp_misc():
     import aiohttp
 
-    async with aiohttp.ClientSession() as session:
-        aiohttp_misc_api.build(AiohttpClient(session, base_url=BASE_URL))
+    async with aiohttp.ClientSession(base_url=BASE_URL) as session:
+        aiohttp_misc_api.build(AiohttpClient(session))
         yield AiohttpMiscController()
 
 
@@ -1145,25 +1153,25 @@ class TestRouteDecoratorValidation:
 
             @saronia.get("/test")
             @classmethod
-            async def bad_classmethod(cls) -> kungfu.Result[None, None]: ...
+            async def bad_classmethod(cls) -> APIResult[None, None]: ...
 
     def test_non_async_not_allowed(self):
         with pytest.raises(TypeError, match="async"):
 
-            @saronia.get("/test")
-            def sync_method(self) -> kungfu.Result[None, None]:  # type: ignore
+            @saronia.get("/test")  # type: ignore
+            def sync_method(self) -> APIResult[None, None]:  # type: ignore
                 ...
 
     def test_missing_return_annotation_raises(self):
         with pytest.raises(TypeError, match="return type"):
 
-            @saronia.get("/test")
+            @saronia.get("/test")  # type: ignore
             async def no_return(self): ...
 
     def test_non_result_return_type_raises(self):
         with pytest.raises(TypeError, match="return type"):
 
-            @saronia.get("/test")
+            @saronia.get("/test")  # type: ignore
             async def wrong_return(self) -> dict:  # type: ignore
                 ...
 
@@ -1175,13 +1183,13 @@ class TestRouteDecoratorValidation:
                 self,
                 a: JSON[str],
                 b: URLencoded[str],
-            ) -> kungfu.Result[None, None]: ...
+            ) -> APIResult[None, None]: ...
 
     def test_missing_path_param_raises(self):
         with pytest.raises(TypeError, match="misses path params"):
 
             @saronia.get("/{missing_param}")
-            async def missing_path(self) -> kungfu.Result[None, None]: ...
+            async def missing_path(self) -> APIResult[None, None]: ...
 
 
 class TestAPIBuilder:
@@ -1199,9 +1207,9 @@ class TestAPIBuilder:
     async def test_build_returns_self(self):
         import aiohttp
 
-        async with aiohttp.ClientSession() as session:
+        async with aiohttp.ClientSession(base_url=BASE_URL) as session:
             api = API.endpoint("/v1")
-            client = AiohttpClient(session, base_url=BASE_URL)
+            client = AiohttpClient(session)
             result = api.build(client)
             assert result is api
 
@@ -1209,17 +1217,17 @@ class TestAPIBuilder:
     async def test_build_sets_client_on_controller_class(self):
         import aiohttp
 
-        async with aiohttp.ClientSession() as session:
+        async with aiohttp.ClientSession(base_url=BASE_URL) as session:
             api = API.endpoint("/v1")
-            client = AiohttpClient(session, base_url=BASE_URL)
+            client = AiohttpClient(session)
 
             @api("/things")
             class ThingsCtrl:
                 @get("")
-                async def list_things(self) -> kungfu.Result[None, None]: ...
+                async def list_things(self) -> APIResult[None, None]: ...
 
             api.build(client)
-            assert ThingsCtrl.client is client
+            assert ThingsCtrl.client is client  # type: ignore
 
     def test_controller_path_set_by_decorator(self):
         api = API.endpoint("/v2")
@@ -1228,7 +1236,7 @@ class TestAPIBuilder:
         class WidgetsCtrl:
             pass
 
-        assert WidgetsCtrl.path == "/widgets"
+        assert WidgetsCtrl.path == "/widgets"  # type: ignore
 
     def test_controller_registered_in_api(self):
         api = API.endpoint("/v3")
@@ -1238,3 +1246,33 @@ class TestAPIBuilder:
             pass
 
         assert MyCtrl in api.controllers
+
+
+class TestSecurity:
+    def test_http_bearer(self):
+        bearer = HTTPBearer("secret123")
+        assert bearer.scheme == "Bearer"
+        assert bearer.credentials == "secret123"
+        assert bearer.header == {"Authorization": "Bearer secret123"}
+
+    def test_http_basic(self):
+        basic = HTTPBasic("user", "pass")
+        assert basic.scheme == "Basic"
+        assert basic.credentials == base64.b64encode(b"user:pass").decode()
+        assert basic.header == {"Authorization": f"Basic {base64.b64encode(b'user:pass').decode()}"}
+
+    def test_header_api_key(self):
+        key = HeaderAPIKey["X-API-Key"]("secret")
+        assert key.name == "X-API-Key"
+        assert key.key == "secret"
+        assert key.mapping == {"X-API-Key": "secret"}
+
+    def test_query_api_key(self):
+        key = QueryAPIKey["api_key"]("secret")
+        assert key.name == "api_key"
+        assert key.mapping == {"api_key": "secret"}
+
+    def test_cookie_api_key(self):
+        key = CookieAPIKey["session"]("token123")
+        assert key.name == "session"
+        assert key.mapping == {"session": "token123"}

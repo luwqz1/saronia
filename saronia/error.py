@@ -9,6 +9,7 @@ from reprlib import recursive_repr
 @dataclasses.dataclass(frozen=True, slots=True)
 class UnknownError:
     message: bytes
+    orig_error: BaseException | None = None
 
 
 class NetworkError(Exception):
@@ -40,16 +41,16 @@ class StatusError:
     """
 
     if typing.TYPE_CHECKING:
-        statuses: typing.ClassVar[tuple[HTTPStatus, ...]]
+        STATUSES: typing.ClassVar[tuple[HTTPStatus, ...]]
     else:
-        statuses = ()
+        STATUSES = ()
 
     def __class_getitem__(cls, statuses: HTTPStatus | tuple[HTTPStatus, ...], /) -> typing.Any:
         return type(
             cls.__name__,
             (),
             {
-                "statuses": (statuses,) if not isinstance(statuses, tuple) else statuses,
+                "STATUSES": (statuses,) if not isinstance(statuses, tuple) else statuses,
                 "__module__": cls.__module__,
             },
         )
