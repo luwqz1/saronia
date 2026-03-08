@@ -42,8 +42,8 @@ books = BooksController()
 
 
 async def main() -> None:
-    async with ClientSession() as session:
-        cool_api.build(AiohttpClient(session, base_url="https://httpbin.org"))
+    async with ClientSession(base_url="https://httpbin.org") as session:
+        cool_api.build(AiohttpClient(session))
 
         # Example: get book by id
         result = await books.get_book_by_id(UUID("12345678-1234-5678-1234-567812345678"))
