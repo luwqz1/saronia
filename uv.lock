@@ -341,15 +341,15 @@ wheels = [
 
 [[package]]
 name = "msgspex"
-version = "1.0.1"
+version = "1.0.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "kungfu-fp" },
     { name = "msgspec" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/5e/c1/94ac162c6ede0489edf76bef75e87d14c92dd0155f458ee07db4a8e2b7cd/msgspex-1.0.1.tar.gz", hash = "sha256:c39d0d356312d0fdb8827e7b4126859c2f01254a61f8f246ed93e4fae584fdd4", size = 24561, upload-time = "2026-03-05T15:58:37.661Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/26/7d/dae76e75fc3e96f98f37a8b7d2e35c25025ba8dd0859fc5cc502ee0dc75e/msgspex-1.0.2.tar.gz", hash = "sha256:9a79c0dd9cc875ad1ab2bf284b12e010f4340ff1898806b707e4187d7e212ba8", size = 25155, upload-time = "2026-03-09T14:19:03.626Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/ca/81/ffd72dc2eb2b6d2b24cce58561eb9103279593f2f86a2e23f4aeebc9a9f7/msgspex-1.0.1-py3-none-any.whl", hash = "sha256:f1cbe718e41c10cecd10ac7a6026b78f6230839a0e9e92097f74d96fae0f5550", size = 37735, upload-time = "2026-03-05T15:58:35.744Z" },
+    { url = "https://files.pythonhosted.org/packages/8a/87/dcdb611fedb8a68371a4697d4bb94a453f168958f75ac47d24e48ddac20d/msgspex-1.0.2-py3-none-any.whl", hash = "sha256:e0250ec103887ab95938d5b43acf7e881b31ae9c61657527a7eb78a637c35292", size = 38379, upload-time = "2026-03-09T14:19:04.809Z" },
 ]
 
 [[package]]
@@ -737,10 +737,10 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "aiohttp", marker = "extra == 'aiohttp'" },
-    { name = "msgspex", specifier = ">=1.0.1" },
+    { name = "msgspex", specifier = ">=1.0.2" },
     { name = "rnet", marker = "extra == 'rnet'", specifier = ">=3.0.0rc22" },
 ]
-provides-extras = ["rnet", "aiohttp"]
+provides-extras = ["aiohttp", "rnet"]
 
 [package.metadata.requires-dev]
 dev = [

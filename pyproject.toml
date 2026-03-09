@@ -27,7 +27,7 @@ keywords = [
   "oas",
   "kungfu",
 ]
-dependencies = ["msgspex>=1.0.1"]
+dependencies = ["msgspex>=1.0.2"]
 classifiers = [
     "Environment :: Console",
     "Intended Audience :: Developers",
