@@ -3,7 +3,6 @@ import typing
 from http import HTTPMethod
 
 from kungfu import Option, Result
-from msgspex.model import Model
 
 from saronia.error import APIError
 
@@ -27,7 +26,7 @@ class MultipartFile(typing.NamedTuple):
 
 class ABCClient(abc.ABC):
     @abc.abstractmethod
-    def auth(self, auth_model: Model) -> None:
+    def auth(self, auth_model: typing.Any) -> None:
         pass
 
     @abc.abstractmethod

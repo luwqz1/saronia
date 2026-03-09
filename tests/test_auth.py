@@ -1,3 +1,4 @@
+import dataclasses
 import threading
 import time
 from http import HTTPStatus
@@ -20,7 +21,8 @@ class BearerAuth(HTTPBearer):
     pass
 
 
-class AUTH(msgspex.Model):
+@dataclasses.dataclass
+class AUTH:
     api_key: ApiKeyAuth | None = None
     token: BearerAuth | None = None
 
@@ -121,34 +123,38 @@ async def client():
 
 @pytest.mark.asyncio
 async def test_public_endpoint(client):
+    controller = TestController()
     api.build(client)
-    result = await TestController().public()
+    result = await controller.public()
     assert result
     assert result.unwrap().message == "public"
 
 
 @pytest.mark.asyncio
 async def test_api_key_auth(client):
+    controller = TestController()
     api.build(client)
     api.auth(ApiKeyAuth("secret123"))
-    result = await TestController().api_key_only()
+    result = await controller.api_key_only()
     assert result
     assert result.unwrap().message == "api-key-ok"
 
 
 @pytest.mark.asyncio
 async def test_bearer_or_api_key(client):
+    controller = TestController()
     api.build(client)
     api.auth(token=BearerAuth("token456"))
-    result = await TestController().bearer_or_api_key()
+    result = await controller.bearer_or_api_key()
     assert result
     assert result.unwrap().message == "bearer-ok"
 
 
 @pytest.mark.asyncio
 async def test_both_required(client):
+    controller = TestController()
     api.build(client)
     api.auth(api_key=ApiKeyAuth("secret123"), token=BearerAuth("token456"))
-    result = await TestController().both_required()
+    result = await controller.both_required()
     assert result
     assert result.unwrap().message == "both-ok"

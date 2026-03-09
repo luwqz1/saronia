@@ -1,27 +1,27 @@
 import typing
 
-import msgspex
-
 from saronia.client.abc import ABCClient
 from saronia.controller import Controller
 
 if typing.TYPE_CHECKING:
+    from _typeshed import DataclassInstance
+
     from saronia.auth import Auth
 
-    type AuthMethod[**P] = typing.Callable[P, msgspex.Model]
+    type AuthMethod[**P] = typing.Callable[P, DataclassInstance]
 
 _SARONIA_CONTROLLER_PATH_ATTR: typing.Final = "__saronia_controller_path__"
 _SARONIA_CONTROLLER_AUTH_ATTR: typing.Final = "__saronia_controller_auth__"
 
 
-def _join_path(base: str, path: str) -> str:
+def join_path(base: str, path: str, /) -> str:
     if not base:
         return path
 
     if not path:
         return base
 
-    return f"{base.rstrip('/')}/{path.lstrip('/')}"
+    return (f"{base.rstrip('/')}/{path.lstrip('/')}".rstrip("/")) or "/"
 
 
 class API[**P = [], R = None]:
@@ -62,7 +62,7 @@ class API[**P = [], R = None]:
         for controller in self.controllers:
             setattr(controller, "client", client)
             original_path = getattr(controller, _SARONIA_CONTROLLER_PATH_ATTR, getattr(controller, "path", ""))
-            setattr(controller, "path", _join_path(self.path, original_path))
+            setattr(controller, "path", join_path(self.path, original_path))
 
         return self
 

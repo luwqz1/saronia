@@ -1,4 +1,5 @@
 import abc
+import dataclasses
 import platform
 import sys
 import typing
@@ -7,13 +8,14 @@ from http import HTTPMethod, HTTPStatus
 
 from kungfu import Error, Option, Result
 from msgspex import decoder
-from msgspex.model import Model
 
 from saronia.__meta__ import __version__
 from saronia.client.abc import ABCClient, MultipartFile
 from saronia.error import APIError, StatusError, UnknownError
 
 if typing.TYPE_CHECKING:
+    from _typeshed import DataclassInstance
+
     from saronia.auth import Auth, AuthComposite
 
 DEFAULT_TIMEOUT: typing.Final = 30.0
@@ -32,7 +34,7 @@ class BaseClient(ABCClient, abc.ABC):
     headers: dict[str, str]
     query_parameters: dict[str, str]
     cookies: dict[str, str]
-    auth_model: Model | None
+    auth_model: DataclassInstance | None
 
     def __init__(self, user_agent: str, base_url: str = "") -> None:
         self.base_url = base_url
@@ -41,8 +43,26 @@ class BaseClient(ABCClient, abc.ABC):
         self.cookies = {}
         self.auth_model = None
 
-    def auth(self, auth_model: Model) -> None:
+    def auth(self, auth_model: DataclassInstance) -> None:
         self.auth_model = auth_model
+
+    @abc.abstractmethod
+    async def request(
+        self,
+        path: str,
+        method: HTTPMethod,
+        *,
+        errors: tuple[typing.Any, ...],
+        response_type: Option[typing.Any],
+        json: Option[str | bytes],
+        headers: Option[typing.Mapping[str, typing.Any]],
+        urlencoded_params: Option[typing.Mapping[str, typing.Any]],
+        query_params: Option[typing.Mapping[str, typing.Any]],
+        body: Option[typing.Any],
+        files: Option[typing.Mapping[str, MultipartFile]],
+        auth: typing.Any = None,
+    ) -> Result[typing.Any, APIError[typing.Any]]:
+        pass
 
     def _to_api_error(
         self,
@@ -66,7 +86,7 @@ class BaseClient(ABCClient, abc.ABC):
 
     def _apply_auth(
         self,
-        auth: "Auth | AuthComposite | None",
+        auth: Auth | AuthComposite | None,
         headers: dict[str, str],
         query_params: dict[str, str],
         cookies: dict[str, str],
@@ -79,14 +99,15 @@ class BaseClient(ABCClient, abc.ABC):
 
         if isinstance(auth, type):
             if self.auth_model is None:
-                raise AuthError(f"Auth {auth.__name__} required but no credentials provided")
+                raise AuthError(f"Auth `{auth.__name__}` required but no credentials provided")
 
-            for field_value in self.auth_model.to_dict().values():
-                if field_value is not None and isinstance(field_value, auth):
+            for field in dataclasses.fields(self.auth_model):
+                field_value = getattr(self.auth_model, field.name)
+                if field_value is not None and type(field_value) is auth:
                     auth = field_value
                     break
             else:
-                raise AuthError(f"Auth {auth.__name__} not found in auth model")
+                raise AuthError(f"Auth `{auth.__name__}` is not defined in `{self.auth_model.__class__.__name__}`")
 
         if isinstance(auth, AuthComposite):
             match auth.op:
@@ -117,24 +138,6 @@ class BaseClient(ABCClient, abc.ABC):
                 headers.update(auth.header)
             case _:
                 raise AuthError(f"Unknown auth type: `{type(auth)}`")
-
-    @abc.abstractmethod
-    async def request(
-        self,
-        path: str,
-        method: HTTPMethod,
-        *,
-        errors: tuple[typing.Any, ...],
-        response_type: Option[typing.Any],
-        json: Option[str | bytes],
-        headers: Option[typing.Mapping[str, typing.Any]],
-        urlencoded_params: Option[typing.Mapping[str, typing.Any]],
-        query_params: Option[typing.Mapping[str, typing.Any]],
-        body: Option[typing.Any],
-        files: Option[typing.Mapping[str, MultipartFile]],
-        auth: typing.Any = None,
-    ) -> Result[typing.Any, APIError[typing.Any]]:
-        pass
 
 
 __all__ = ("BaseClient",)

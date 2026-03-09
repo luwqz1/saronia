@@ -6,6 +6,7 @@ import re
 import secrets
 import types
 import typing
+import urllib.parse
 from functools import partial, wraps
 from http import HTTPMethod
 
@@ -16,6 +17,7 @@ from kungfu.library.monad.option import NOTHING
 from msgspex.tools.fullname import fullname
 from msgspex.tools.model import get_class_annotations
 
+from saronia.api import join_path
 from saronia.client.abc import MultipartFile
 from saronia.controller import Controller
 from saronia.parameters import (
@@ -97,18 +99,10 @@ def _to_x_header_name(name: str) -> str:
     return "X-" + "-".join(part.capitalize() for part in name.split("_"))
 
 
-def _join_path(base_path: str, route_path: str, /) -> str:
-    if not base_path:
-        return route_path
-
-    if not route_path:
-        return base_path
-
-    return f"{base_path.rstrip('/')}/{route_path.lstrip('/')}"
-
-
-def _render_path(path_template: str, path_params: dict[str, typing.Any], /) -> str:
-    return path_template.format_map(path_params)
+def _render_path(path_template: str, path_params: typing.Mapping[str, typing.Any], /) -> str:
+    return path_template.format_map(
+        {name: urllib.parse.quote(str(value), safe="") for name, value in path_params.items()},
+    )
 
 
 def _get_body_parameter(
@@ -422,7 +416,7 @@ def route(
 
             parsed = _parse_method_form(
                 method=method,
-                path_template=_join_path(self.path, __path),
+                path_template=join_path(self.path, __path),
                 form=form_spec.form_model.from_data(*args, **kwargs),
                 form_spec=form_spec,
             )
