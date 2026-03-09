@@ -34,7 +34,12 @@ from saronia import API, APIResult, HTTPBearer, StatusError, get, post
 from rnet import Client
 from saronia import RnetClient
 
-cool_api = API.endpoint("/coolapi/v1").bind_auth(HTTPBearer)
+
+class Auth(Model):
+    bearer: HTTPBearer
+
+
+cool_api = API.endpoint("/coolapi/v1").bind_auth(Auth)
 
 
 class ValidationError(Model, StatusError[HTTPStatus.INTERNAL_SERVER_ERROR]):
@@ -73,11 +78,7 @@ async def main() -> None:
     client = Client()
 
     cool_api.build(RnetClient(client, base_url="https://api.example.com", request_timeout=45.0))
-    cool_api.auth(token="abc123...")
-
-    # Or using aiohttp
-    # async with ClientSession() as session:
-    #     cool_api.build(AiohttpClient(session, base_url="https://api.example.com"))
+    cool_api.auth(token=HTTPBearer("abc123..."))
 
     book = (await books.get_book_by_id(UUID("12345678-1234-5678-1234-567812345678"))).unwrap()
     print(f"Book: {book.name}")
