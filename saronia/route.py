@@ -501,7 +501,7 @@ def route(
             parsed = _parse_method_form(
                 method=method,
                 path_template=join_path(self.path, __path),
-                form=(x := msgspex.decoder.convert(arguments, type=form_spec.form_model)),
+                form=msgspex.decoder.convert(arguments, type=form_spec.form_model),
                 form_spec=form_spec,
             )
             controller_auth = getattr(type(self), SARONIA_CONTROLLER_AUTH_ATTR, None)
