@@ -27,7 +27,9 @@ keywords = [
   "oas",
   "kungfu",
 ]
-dependencies = ["msgspex>=1.0.2"]
+dependencies = [
+    "msgspex>=1.1.0",
+]
 classifiers = [
     "Environment :: Console",
     "Intended Audience :: Developers",
@@ -44,7 +46,7 @@ aiohttp = ["aiohttp"]
 
 [dependency-groups]
 dev = [
-    "ruff>=0.15.5,<1",
+    "ruff>=0.15.6,<1",
     "basedpyright>=1.38.2,<2",
     "pre-commit>=4.5.1,<5",
     "pytest>=9.0.2",

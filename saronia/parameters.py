@@ -16,7 +16,7 @@ QUERY_MODEL_ATTR: typing.Final = "__saronia_query_model__"
 
 
 @decoder.set_default_dec_hook
-def saronia_default_decoder(t: typing.Any, obj: typing.Any) -> typing.Any:
+def saronia_default_decoder(t: typing.Any, obj: typing.Any, **_: typing.Any) -> typing.Any:
     orig_type = get_origin(t)
 
     if isinstance(obj, orig_type):

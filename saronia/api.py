@@ -10,8 +10,8 @@ if typing.TYPE_CHECKING:
 
     type AuthMethod[**P] = typing.Callable[P, DataclassInstance]
 
-_SARONIA_CONTROLLER_PATH_ATTR: typing.Final = "__saronia_controller_path__"
-_SARONIA_CONTROLLER_AUTH_ATTR: typing.Final = "__saronia_controller_auth__"
+SARONIA_CONTROLLER_PATH_ATTR: typing.Final = "__saronia_controller_path__"
+SARONIA_CONTROLLER_AUTH_ATTR: typing.Final = "__saronia_controller_auth__"
 
 
 def join_path(base: str, path: str, /) -> str:
@@ -41,8 +41,8 @@ class API[**P = [], R = None]:
     def __call__[T](self, path: str, /, *, auth: "Auth | type[Auth] | None" = None) -> typing.Callable[[type[T]], type[T]]:
         def register_controller(x: type[Controller], /) -> type[Controller]:
             setattr(x, "path", path)
-            setattr(x, _SARONIA_CONTROLLER_PATH_ATTR, path)
-            setattr(x, _SARONIA_CONTROLLER_AUTH_ATTR, auth)
+            setattr(x, SARONIA_CONTROLLER_PATH_ATTR, path)
+            setattr(x, SARONIA_CONTROLLER_AUTH_ATTR, auth)
             self.controllers.add(x)
             return x
 
@@ -61,7 +61,7 @@ class API[**P = [], R = None]:
 
         for controller in self.controllers:
             setattr(controller, "client", client)
-            original_path = getattr(controller, _SARONIA_CONTROLLER_PATH_ATTR, getattr(controller, "path", ""))
+            original_path = getattr(controller, SARONIA_CONTROLLER_PATH_ATTR, getattr(controller, "path", ""))
             setattr(controller, "path", join_path(self.path, original_path))
 
         return self

@@ -847,8 +847,8 @@ class TestAiohttpErrors:
     async def test_400_parsed_as_error_message(self, aiohttp_errors):
         err = assert_error(await aiohttp_errors.get_400())
         assert err.status == HTTPStatus.BAD_REQUEST
-        assert err.is_client_error
-        assert not err.is_server_error
+        assert err.status.is_client_error
+        assert not err.status.is_server_error
         assert isinstance(err.error, ErrorMessage)
         assert err.error.message == "bad request"
 
@@ -856,7 +856,7 @@ class TestAiohttpErrors:
     async def test_404_parsed_as_error_message(self, aiohttp_errors):
         err = assert_error(await aiohttp_errors.get_404())
         assert err.status == HTTPStatus.NOT_FOUND
-        assert err.is_client_error
+        assert err.status.is_client_error
         assert isinstance(err.error, ErrorMessage)
         assert err.error.message == "not found"
 
@@ -872,8 +872,8 @@ class TestAiohttpErrors:
     async def test_500_is_server_error(self, aiohttp_errors):
         err = assert_error(await aiohttp_errors.get_500())
         assert err.status == HTTPStatus.INTERNAL_SERVER_ERROR
-        assert err.is_server_error
-        assert not err.is_client_error
+        assert err.status.is_server_error
+        assert not err.status.is_client_error
         assert isinstance(err.error, ErrorMessage)
 
     @pytest.mark.asyncio
@@ -1053,14 +1053,14 @@ class TestRnetErrors:
     async def test_400_parsed_as_error_message(self, rnet_errors):
         err = assert_error(await rnet_errors.get_400())
         assert err.status == HTTPStatus.BAD_REQUEST
-        assert err.is_client_error
+        assert err.status.is_client_error
         assert isinstance(err.error, ErrorMessage)
 
     @pytest.mark.asyncio
     async def test_404_parsed_as_error_message(self, rnet_errors):
         err = assert_error(await rnet_errors.get_404())
         assert err.status == HTTPStatus.NOT_FOUND
-        assert err.is_client_error
+        assert err.status.is_client_error
         assert isinstance(err.error, ErrorMessage)
 
     @pytest.mark.asyncio
@@ -1074,7 +1074,7 @@ class TestRnetErrors:
     async def test_500_is_server_error(self, rnet_errors):
         err = assert_error(await rnet_errors.get_500())
         assert err.status == HTTPStatus.INTERNAL_SERVER_ERROR
-        assert err.is_server_error
+        assert err.status.is_server_error
 
     @pytest.mark.asyncio
     async def test_empty_body_error_is_none(self, rnet_errors):
@@ -1104,18 +1104,18 @@ class TestRnetMisc:
 class TestAPIErrorUnit:
     def test_4xx_is_client_error(self):
         err = saronia.APIError(None, HTTPMethod.GET, HTTPStatus.NOT_FOUND, path="/test")
-        assert err.is_client_error is True
-        assert err.is_server_error is False
+        assert err.status.is_client_error is True
+        assert err.status.is_server_error is False
 
     def test_5xx_is_server_error(self):
         err = saronia.APIError(None, HTTPMethod.POST, HTTPStatus.INTERNAL_SERVER_ERROR)
-        assert err.is_server_error is True
-        assert err.is_client_error is False
+        assert err.status.is_server_error is True
+        assert err.status.is_client_error is False
 
     def test_2xx_is_neither(self):
         err = saronia.APIError(None, HTTPMethod.GET, HTTPStatus.OK)
-        assert err.is_client_error is False
-        assert err.is_server_error is False
+        assert err.status.is_client_error is False
+        assert err.status.is_server_error is False
 
     def test_repr_includes_status_path_request_id(self):
         err = saronia.APIError(None, HTTPMethod.GET, HTTPStatus.BAD_REQUEST, path="/bad", request_id="req-1")

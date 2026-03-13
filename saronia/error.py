@@ -8,6 +8,8 @@ from reprlib import recursive_repr
 if typing.TYPE_CHECKING:
     from saronia.auth import AuthError
 
+type BaseError = AuthError | NetworkError | UnknownError
+
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class UnknownError:
@@ -59,7 +61,7 @@ class StatusError:
         )
 
 
-class APIError[E = typing.Never](Exception):
+class APIError[Error = typing.Never](Exception):
     """Represents an API error response.
 
     Attributes:
@@ -71,13 +73,13 @@ class APIError[E = typing.Never](Exception):
 
     """
 
-    error: E | AuthError | NetworkError | UnknownError
-
     __match_args__ = ("error", "method", "status", "path", "request_id")
+
+    error: Error | BaseError
 
     def __init__(
         self,
-        error: E,
+        error: Error | BaseError,
         method: HTTPMethod,
         status: HTTPStatus,
         *,
@@ -106,16 +108,6 @@ class APIError[E = typing.Never](Exception):
 
         parts.append(f"error={self.error!r}")
         return f"<{' '.join(parts)}>"
-
-    @property
-    def is_client_error(self) -> bool:
-        """Returns True if status is 4xx."""
-        return 400 <= self.status.value < 500
-
-    @property
-    def is_server_error(self) -> bool:
-        """Returns True if status is 5xx."""
-        return 500 <= self.status.value < 600
 
 
 __all__ = ("APIError", "NetworkError", "StatusError", "UnknownError")

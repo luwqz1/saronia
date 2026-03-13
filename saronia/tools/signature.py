@@ -24,12 +24,16 @@ class Parameter:
 
 @dataclasses.dataclass(frozen=True)
 class Signature:
+    sig: inspect.Signature
     var_pos_only: Parameter | None = dataclasses.field(default=None)
     args: tuple[Parameter, ...] = dataclasses.field(default_factory=tuple)
     var_kw_only: Parameter | None = dataclasses.field(default=None)
     kw_only_args: tuple[Parameter, ...] = dataclasses.field(default_factory=tuple)
     kw_args: tuple[Parameter, ...] = dataclasses.field(default_factory=tuple)
     return_type: typing.Any = dataclasses.field(default_factory=lambda: inspect.Parameter.empty)
+
+    def bind_arguments(self, *args: typing.Any, **kwargs: typing.Any) -> typing.Mapping[str, typing.Any]:
+        return self.sig.bind(*args, **kwargs).arguments
 
     @classmethod
     def from_callable(cls, callable: typing.Callable[..., typing.Any], /) -> typing.Self:
@@ -63,6 +67,7 @@ class Signature:
                     typing.assert_never(parameter.kind)
 
         return cls(
+            sig=signature,
             var_pos_only=var_pos_only,
             args=tuple(pos_only_args),
             var_kw_only=var_kw_only,
