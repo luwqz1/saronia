@@ -157,6 +157,35 @@ else:
     FileBuffer = typing.Annotated[io.BufferedIOBase, File()]
 
 
+if typing.TYPE_CHECKING:
+    from typing import Annotated as Param
+
+else:
+
+    @dataclasses.dataclass(frozen=True, slots=True)
+    class Param:
+        annotation: typing.Any
+        parameter: Parameter = dataclasses.field(default_factory=PathParameter)
+        name: str | None = None
+
+        def __class_getitem__(cls, item: typing.Any, /) -> typing.Any:
+            if not isinstance(item, tuple):
+                raise ValueError(f"Expected annotation and parameter, got `{item!r}`.")
+
+            if len(item) > 3:
+                raise ValueError(f"Expected at most 3 arguments: `annotation`, `parameter` and optional `name`, but {len(item)} were given.")
+
+            if len(item) >= 2:
+                parameter = get_annotated_parameter(item[1])
+
+                if parameter is None:
+                    raise ValueError(f"Expected kind of Parameter, but `{item[1]!r}` were given.")
+
+                item = (item[0], parameter) + item[2:]
+
+            return cls(*item)
+
+
 __all__ = (
     "IO",
     "JSON",
@@ -171,6 +200,7 @@ __all__ = (
     "Header",
     "MappingBody",
     "ModelBody",
+    "Param",
     "Path",
     "Query",
     "Stream",
