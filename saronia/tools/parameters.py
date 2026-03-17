@@ -168,6 +168,9 @@ else:
         parameter: Parameter = dataclasses.field(default_factory=PathParameter)
         name: str | None = None
 
+        def to_annotated(self) -> typing.Any:
+            return typing.Annotated[self.annotation, self.parameter]
+
         def __class_getitem__(cls, item: typing.Any, /) -> typing.Any:
             if not isinstance(item, tuple):
                 raise ValueError(f"Expected annotation and parameter, got `{item!r}`.")

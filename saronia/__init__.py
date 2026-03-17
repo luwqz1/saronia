@@ -3,6 +3,6 @@ from saronia.auth import *
 from saronia.client import *
 from saronia.controller import *
 from saronia.error import *
-from saronia.parameters import *
 from saronia.route import *
 from saronia.security import *
+from saronia.tools.parameters import *

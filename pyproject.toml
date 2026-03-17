@@ -28,7 +28,7 @@ keywords = [
   "kungfu",
 ]
 dependencies = [
-    "msgspex>=1.1.2",
+    "msgspex>=1.2.0",
 ]
 classifiers = [
     "Environment :: Console",

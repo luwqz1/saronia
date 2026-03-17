@@ -19,29 +19,29 @@ from msgspex import Model
 import saronia
 from saronia import API, AiohttpClient, APIResult, RnetClient, delete, get, patch, post, put
 from saronia.error import UnknownError
-from saronia.parameters import (
-    JSON,
-    FileBuffer,
-    URLencoded,
-)
-from saronia.parameters import (
-    Header as SHeader,
-)
-from saronia.parameters import (
-    Path as SPath,
-)
-from saronia.parameters import (
-    Query as SQuery,
-)
-from saronia.parameters import (
-    XHeader as SXHeader,
-)
 from saronia.security import (
     CookieAPIKey,
     HeaderAPIKey,
     HTTPBasic,
     HTTPBearer,
     QueryAPIKey,
+)
+from saronia.tools.parameters import (
+    JSON,
+    FileBuffer,
+    URLencoded,
+)
+from saronia.tools.parameters import (
+    Header as SHeader,
+)
+from saronia.tools.parameters import (
+    Path as SPath,
+)
+from saronia.tools.parameters import (
+    Query as SQuery,
+)
+from saronia.tools.parameters import (
+    XHeader as SXHeader,
 )
 
 app = FastAPI()

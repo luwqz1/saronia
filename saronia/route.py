@@ -21,7 +21,8 @@ from msgspex.tools.model import get_class_annotations
 from saronia.api import join_path
 from saronia.client.abc import MultipartFile
 from saronia.controller import Controller
-from saronia.parameters import (
+from saronia.tools.model_from_signature import create_model_from_function_signature
+from saronia.tools.parameters import (
     Body,
     File,
     HeaderParameter,
@@ -37,22 +38,21 @@ from saronia.parameters import (
     is_query,
     is_urlencoded,
 )
-from saronia.parameters import (
+from saronia.tools.parameters import (
     header as as_header,
 )
-from saronia.parameters import (
+from saronia.tools.parameters import (
     json as as_json,
 )
-from saronia.parameters import (
+from saronia.tools.parameters import (
     path as as_path,
 )
-from saronia.parameters import (
+from saronia.tools.parameters import (
     query as as_query,
 )
-from saronia.parameters import (
+from saronia.tools.parameters import (
     urlencoded as as_urlencoded,
 )
-from saronia.tools.model_from_signature import create_model_from_function_signature
 from saronia.tools.signature import get_function_signature
 
 type ParameterName = str
@@ -194,8 +194,10 @@ def _get_form_spec(form_model: type[msgspex.Model], /) -> FormSpec:
     header_parameters: Parameters = {}
     json_parameters: Parameters = {}
     files: Files = {}
+    aliases = form_model.get_aliases_fields()
 
     for field_name in form_model.get_fields():
+        field_alias_name = aliases.get(field_name)
         parameter = get_annotated_parameter(model_annotations.get(field_name))
 
         if parameter is None and is_decorated:
@@ -219,19 +221,19 @@ def _get_form_spec(form_model: type[msgspex.Model], /) -> FormSpec:
                     f"is not allowed to be used with `Body` parameter called `{body[0]}`.",
                 )
             case QueryParameter(alias_name):
-                query_parameters[field_name] = alias_name
+                query_parameters[field_name] = alias_name or field_alias_name
             case XHeaderParameter(alias_name):
-                header_parameters[field_name] = alias_name or _to_x_header_name(field_name)
+                header_parameters[field_name] = _to_x_header_name(alias_name or field_alias_name or field_name)
             case HeaderParameter(alias_name):
-                header_parameters[field_name] = alias_name or _to_header_name(field_name)
+                header_parameters[field_name] = _to_header_name(alias_name or field_alias_name or field_name)
             case JSONParameter(alias_name):
-                json_parameters[field_name] = alias_name
+                json_parameters[field_name] = alias_name or field_alias_name
             case URLencodedParameter(alias_name):
-                urlencoded_parameters[field_name] = alias_name
+                urlencoded_parameters[field_name] = alias_name or field_alias_name
             case PathParameter(alias_name):
-                path_parameters[field_name] = alias_name
+                path_parameters[field_name] = alias_name or field_alias_name
             case File(filename, mime):
-                files[field_name] = (filename, mime)
+                files[field_alias_name or field_name] = (filename, mime)
 
     return _build_form_spec(
         form_model=form_model,
