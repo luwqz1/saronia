@@ -3,6 +3,7 @@ import io
 import pathlib
 import typing
 
+import msgspex
 from msgspex import Model, decoder, fullname, get_origin
 
 if typing.TYPE_CHECKING:
@@ -86,6 +87,12 @@ def get_annotated_parameter(annotation: AnnotationForm, /) -> Parameter | None:
     return param
 
 
+@dataclasses.dataclass(slots=True, frozen=True)
+class Deprecated:
+    message: str | None = None
+    stacklevel: int = 5
+
+
 @dataclasses.dataclass(frozen=True)
 class Parameter: ...
 
@@ -167,16 +174,23 @@ else:
         annotation: typing.Any
         parameter: Parameter = dataclasses.field(default_factory=PathParameter)
         name: str | None = None
+        deprecated: Deprecated | None = None
 
-        def to_annotated(self) -> typing.Any:
-            return typing.Annotated[self.annotation, self.parameter]
+        def to_annotated(self, param: str, route_name: str) -> typing.Any:
+            annotated = typing.Annotated[self.annotation, self.parameter]
+
+            if self.deprecated is not None:
+                message = self.deprecated.message or f"Parameter `{param}` of `{route_name}` route is deprecated and will be removed in future releases."
+                annotated = msgspex.Deprecated[annotated, message, self.deprecated.stacklevel]
+
+            return annotated
 
         def __class_getitem__(cls, item: typing.Any, /) -> typing.Any:
             if not isinstance(item, tuple):
                 raise ValueError(f"Expected annotation and parameter, got `{item!r}`.")
 
-            if len(item) > 3:
-                raise ValueError(f"Expected at most 3 arguments: `annotation`, `parameter` and optional `name`, but {len(item)} were given.")
+            if len(item) > 4:
+                raise ValueError(f"Expected at most 4 arguments: `annotation`, `parameter`, optionals `name` and `deprecated`, but {len(item)} were given.")
 
             if len(item) >= 2:
                 parameter = get_annotated_parameter(item[1])
@@ -185,6 +199,9 @@ else:
                     raise ValueError(f"Expected kind of Parameter, but `{item[1]!r}` were given.")
 
                 item = (item[0], parameter) + item[2:]
+
+                if len(item) == 3 and isinstance(deprecated := item[2], Deprecated):
+                    item = item[:2] + (None, deprecated)
 
             return cls(*item)
 
@@ -196,6 +213,7 @@ __all__ = (
     "AsyncStream",
     "BytesBody",
     "BytesIO",
+    "Deprecated",
     "FileBinary",
     "FileBuffer",
     "FileIO",

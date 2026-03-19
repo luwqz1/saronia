@@ -18,113 +18,115 @@ type CoroutineType[R] = typing.Coroutine[typing.Any, typing.Any, R]
 type RouteDecorator[**P, R] = typing.Callable[[typing.Callable[P, CoroutineType[R]]], typing.Callable[P, CoroutineType[R]]]
 
 @typing.overload
-def route[**P, T, E](method: HTTPMethod, path: str, /) -> RouteDecorator[P, APIResult[T, E]]: ...
+def route[**P, R](method: HTTPMethod, path: str, /) -> RouteDecorator[P, R]: ...
 @typing.overload
-def route[**P, T, E](
+def route[**P, R](
     method: HTTPMethod,
     path: str,
     /,
-    *,
-    deprecated_parameters: typing.Mapping[ParameterName, DeprecationMessage | None] | None = ...,
-) -> RouteDecorator[P, APIResult[T, E]]: ...
+    *errors: typing.Any,
+) -> RouteDecorator[P, R]: ...
 @typing.overload
-def route[**P, T, E](
+def route[**P, R](
     method: HTTPMethod,
     path: str,
     /,
     *,
     auth: Authorization | None = ...,
-    deprecated_parameters: typing.Mapping[ParameterName, DeprecationMessage | None] | None = ...,
-) -> RouteDecorator[P, APIResult[T, E]]: ...
+) -> RouteDecorator[P, R]: ...
 @typing.overload
-def route[**P, **X, C, T, E](
+def route[**P, R](
+    method: HTTPMethod,
+    path: str,
+    /,
+    *errors: typing.Any,
+    auth: Authorization | None = ...,
+) -> RouteDecorator[P, R]: ...
+@typing.overload
+def route[**P, **X, C, R](
     method: HTTPMethod,
     path: str,
     form: typing.Callable[P, Model],
     /,
     *,
     auth: Authorization | None = ...,
-    deprecated_parameters: typing.Mapping[ParameterName, DeprecationMessage | None] | None = ...,
 ) -> typing.Callable[
-    [typing.Callable[typing.Concatenate[C, X], CoroutineType[Result[T, APIError[E]]]]],
-    typing.Callable[typing.Concatenate[C, P], CoroutineType[Result[T, APIError[E]]]],
+    [typing.Callable[typing.Concatenate[C, X], CoroutineType[R]]],
+    typing.Callable[typing.Concatenate[C, P], CoroutineType[R]],
 ]: ...
 @typing.overload
-def route[**P, C, T, E](
+def route[**P, **X, C, R](
     method: HTTPMethod,
     path: str,
     form: typing.Callable[P, Model],
     /,
-    *,
+    *errors: typing.Any,
     auth: Authorization | None = ...,
-    response: type[T] = ...,
-    deprecated_parameters: typing.Mapping[ParameterName, DeprecationMessage | None] | None = ...,
-) -> RouteDecorator[typing.Concatenate[C, P], APIResult[T, E]]: ...
+) -> typing.Callable[
+    [typing.Callable[typing.Concatenate[C, X], CoroutineType[R]]],
+    typing.Callable[typing.Concatenate[C, P], CoroutineType[R]],
+]: ...
 @typing.overload
-def route[**P, T, E](
+def route[**P, R](
     method: HTTPMethod,
     path: str,
+    form: typing.Callable[P, Model],
     /,
-    *,
+    *errors: typing.Any,
     auth: Authorization | None = ...,
-    response: type[T] = ...,
-    deprecated_parameters: typing.Mapping[ParameterName, DeprecationMessage | None] | None = ...,
-) -> RouteDecorator[P, APIResult[T, E]]: ...
+    response: type[R] = ...,
+) -> RouteDecorator[P, R]: ...
 @typing.overload
-def route[**P, T, E](
+def route[**P, R](
     method: HTTPMethod,
     __path: str,
     /,
-    *,
+    *errors: typing.Any,
     path: bool = True,
     auth: Authorization | None = ...,
-    response: type[T] = ...,
-    deprecated_parameters: typing.Mapping[ParameterName, DeprecationMessage | None] | None = ...,
-) -> RouteDecorator[P, APIResult[T, E]]: ...
+    response: type[R] = ...,
+) -> RouteDecorator[P, R]: ...
 @typing.overload
-def route[**P, T, E](
+def route[**P, R](
     method: HTTPMethod,
     path: str,
     /,
-    *,
+    *errors: typing.Any,
     query: bool,
     auth: Authorization | None = ...,
-    response: type[T] = ...,
-    deprecated_parameters: typing.Mapping[ParameterName, DeprecationMessage | None] | None = ...,
-) -> RouteDecorator[P, APIResult[T, E]]: ...
+    response: type[R] = ...,
+) -> RouteDecorator[P, R]: ...
 @typing.overload
-def route[**P, T, E](
+def route[**P, R](
     method: HTTPMethod,
     path: str,
     /,
-    *,
+    *errors: typing.Any,
     headers: bool,
     auth: Authorization | None = ...,
-    response: type[T] = ...,
-    deprecated_parameters: typing.Mapping[ParameterName, DeprecationMessage | None] | None = ...,
-) -> RouteDecorator[P, APIResult[T, E]]: ...
+    response: type[R] = ...,
+) -> RouteDecorator[P, R]: ...
 @typing.overload
-def route[**P, T, E](
+def route[**P, R](
     method: HTTPMethod,
     path: str,
     /,
-    *,
+    *errors: typing.Any,
     json: bool,
     auth: Authorization | None = ...,
-    response: type[T] = ...,
-    deprecated_parameters: typing.Mapping[ParameterName, DeprecationMessage | None] | None = ...,
-) -> RouteDecorator[P, APIResult[T, E]]: ...
+    response: type[R] = ...,
+) -> RouteDecorator[P, R]: ...
 @typing.overload
-def route[**P, T, E](
+def route[**P, R](
     method: HTTPMethod,
     path: str,
     /,
-    *,
+    *errors: typing.Any,
     urlencoded: bool,
     auth: Authorization | None = ...,
-    response: type[T] = ...,
-    deprecated_parameters: typing.Mapping[ParameterName, DeprecationMessage | None] | None = ...,
-) -> RouteDecorator[P, APIResult[T, E]]: ...
+    response: type[R] = ...,
+) -> RouteDecorator[P, R]: ...
+
 def __route_http_method[**P, R](
     route_callable: typing.Callable[typing.Concatenate[typing.Any, P], R],
     /,

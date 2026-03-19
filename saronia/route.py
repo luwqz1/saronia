@@ -7,7 +7,6 @@ import secrets
 import types
 import typing
 import urllib.parse
-import warnings
 from functools import partial, wraps
 from http import HTTPMethod
 
@@ -113,7 +112,7 @@ def _get_body_parameter(
 ) -> tuple[str, Body] | None:
     res = None
 
-    for field_name in form_model.get_fields():
+    for field_name in form_model.__model_accessible_fields__:
         if type(b := get_annotated_parameter(annotations.get(field_name))) is Body:
             if res is None:
                 res = (field_name, b)
@@ -194,9 +193,9 @@ def _get_form_spec(form_model: type[msgspex.Model], /) -> FormSpec:
     header_parameters: Parameters = {}
     json_parameters: Parameters = {}
     files: Files = {}
-    aliases = form_model.get_aliases_fields()
+    aliases = form_model.__model_aliases_fields__
 
-    for field_name in form_model.get_fields():
+    for field_name in form_model.__model_accessible_fields__:
         field_alias_name = aliases.get(field_name)
         parameter = get_annotated_parameter(model_annotations.get(field_name))
 
@@ -260,6 +259,14 @@ def _create_form_spec(
 ) -> FormSpec:
     if form is None and function is not None:
         form = create_model_from_function_signature(function)
+
+        if hasattr(function, _ROUTE_DEPRECATED_ATTR):
+            deprecated_kwargs = getattr(function, _ROUTE_DEPRECATED_ATTR)
+            form = msgspex.model_deprecated(
+                deprecated_kwargs["message"],
+                category=deprecated_kwargs.get("category", PendingDeprecationWarning),
+                stacklevel=deprecated_kwargs.get("stacklevel", 3),
+            )(form)
 
         if is_path:
             form = as_path(form)
@@ -362,47 +369,22 @@ def _parse_method_form(
     )
 
 
-def _warn_deprecated_parameters_of_method(
-    method_name: str,
-    parameters: typing.Iterable[str],
-    deprecations: typing.Mapping[str, str | None],
-    already_warned_deprecations: typing.Container[str],
-) -> set[str] | None:
-    deprecated_parameters = {
-        parameter: deprecations[parameter] for parameter in parameters if parameter in deprecations and parameter not in already_warned_deprecations
-    }
-
-    if not deprecated_parameters:
-        return None
-
-    result: set[str] = set()
-
-    with warnings.catch_warnings(action="module", category=PendingDeprecationWarning):
-        for parameter, message in deprecated_parameters.items():
-            warnings.warn(
-                message
-                or f"Parameter `{parameter}` of `{method_name}` method is deprecated and will be removed "
-                "in future versions. Please consider to avoid using this parameter.",
-                category=PendingDeprecationWarning,
-                stacklevel=3,
-            )
-            result.add(parameter)
-
-    return result
-
-
 def route_deprecated(
-    message: str,
+    message: str | None = None,
     *,
     category: type[Warning] = PendingDeprecationWarning,
-    stacklevel: int = 3,
+    stacklevel: int = 5,
 ) -> typing.Callable[..., typing.Any]:
     def decorator(fn: typing.Callable[..., typing.Any], /) -> typing.Callable[..., typing.Any]:
         if not hasattr(fn, _ROUTE_DEPRECATED_ATTR):
             setattr(
                 fn,
                 _ROUTE_DEPRECATED_ATTR,
-                dict(message=message, category=category, stacklevel=stacklevel),
+                dict(
+                    message=message or f"Route `{fn.__name__}` is deprecated and will be removed in future releases.",
+                    category=category,
+                    stacklevel=stacklevel,
+                ),
             )
 
         return fn
@@ -415,8 +397,7 @@ def route(
     __path: str,
     form: type[msgspex.Model] | None = None,
     /,
-    *,
-    deprecated_parameters: typing.Mapping[str, str | None] | None = None,
+    *errors: typing.Any,
     auth: typing.Any = _NOAUTH,
     response: typing.Any = _NORESPONSE,
     path: bool = True,
@@ -426,37 +407,38 @@ def route(
     json: bool = False,
 ) -> typing.Callable[[typing.Callable[..., typing.Any]], typing.Callable[..., typing.Any]]:
     form_spec: FormSpec | None = None
-    is_route_deprecation_warned = False
-    errors: tuple[typing.Any, ...] = ()
+    _errors: tuple[typing.Any, ...] = errors
+    as_result = False
 
     if form is not None:
         form_spec = _create_form_spec(__path, form)
 
     def decorator(fn: typing.Callable[..., typing.Any], /) -> typing.Callable[..., typing.Any]:
         if isinstance(fn, classmethod | staticmethod):
-            raise TypeError("classmethods and staticmethods is not allowed.")
+            raise TypeError("classmethods and staticmethods is not allowed for decorated controller method.")
 
         if not inspect.iscoroutinefunction(fn):
             raise TypeError("Decorated controller method must be async.")
 
         sig = get_function_signature(fn)
 
-        if not sig.has_return_type or typing.get_origin(sig.return_type) not in (APIResult, kungfu.Result):
-            raise TypeError("Decorated controller method should have a return type `APIResult`.")
+        nonlocal form_spec, _errors, response, as_result
 
-        nonlocal form_spec, errors, response
+        if sig.has_return_type and (typing.get_origin(sig.return_type) or sig.return_type in (APIResult, kungfu.Result)):
+            if len(typing.get_args(sig.return_type)) == 2:
+                as_result = True
+                resp, error = typing.get_args(sig.return_type)
+                _errors = typing.get_args(error) if isinstance(error, types.UnionType) else (error,)
+            elif len(typing.get_args(sig.return_type)) == 1:
+                as_result = True
+                resp = typing.get_args(sig.return_type)[0]
+            else:
+                resp = response
 
-        if len(typing.get_args(sig.return_type)) == 2:
-            resp, error = typing.get_args(sig.return_type)
-            errors = typing.get_args(error) if isinstance(error, types.UnionType) else (error,)
-        elif len(typing.get_args(sig.return_type)) == 1:
-            resp = typing.get_args(sig.return_type)[0]
-            error = errors = ()
-        else:
-            resp, error = (_NORESPONSE, ())
-            errors = error
+            response = resp if response is _NORESPONSE else response
 
-        response = resp if response is _NORESPONSE else response
+        elif sig.has_return_type:
+            response = sig.return_type
 
         if form_spec is None:
             form_spec = _create_form_spec(
@@ -471,46 +453,23 @@ def route(
 
         from saronia.api import SARONIA_CONTROLLER_AUTH_ATTR
 
-        if deprecated_parameters:
-            already_warned_deprecations: set[str] = set()
-
         @wraps(fn)
-        async def wrapper(self: Controller, /, *args: typing.Any, **kwargs: typing.Any) -> typing.Any:
+        async def wrapper(controller: Controller, /, *args: typing.Any, **kwargs: typing.Any) -> typing.Any:
             if form_spec is None:
                 raise AssertionError("form_spec is None")
 
-            nonlocal is_route_deprecation_warned
-
-            if not is_route_deprecation_warned and hasattr(fn, _ROUTE_DEPRECATED_ATTR):
-                msgspex.warn_deprecation(**getattr(fn, _ROUTE_DEPRECATED_ATTR))
-                is_route_deprecation_warned = True
-
-            arguments = form_spec.form_model.__signature__.bind(*args, **kwargs).arguments
-            if (
-                arguments
-                and deprecated_parameters
-                and (
-                    warned_deprecations := _warn_deprecated_parameters_of_method(
-                        fullname(fn),
-                        arguments.keys(),
-                        deprecated_parameters,
-                        already_warned_deprecations,
-                    )
-                )
-            ):
-                already_warned_deprecations.update(warned_deprecations)
-
             parsed = _parse_method_form(
                 method=method,
-                path_template=join_path(self.path, __path),
-                form=msgspex.decoder.convert(arguments, type=form_spec.form_model),
+                path_template=join_path(controller.path, __path),
                 form_spec=form_spec,
+                form=form_spec.form_model.from_data(*args, **kwargs),
             )
-            controller_auth = getattr(type(self), SARONIA_CONTROLLER_AUTH_ATTR, None)
-            return await self.client.request(
+            return await controller.client.request(
                 parsed.path,
                 method,
-                errors=errors,
+                as_result=as_result,
+                auth=_resolve_auth(getattr(type(controller), SARONIA_CONTROLLER_AUTH_ATTR, None), auth),
+                errors=_errors,
                 response_type=NOTHING if response is _NORESPONSE else Some(response),
                 json=parsed.json,
                 headers=parsed.header_params,
@@ -518,10 +477,9 @@ def route(
                 query_params=parsed.query_params,
                 body=parsed.body,
                 files=parsed.files,
-                auth=_resolve_auth(controller_auth, auth),
             )
 
-        del sig, resp, error
+        del sig
         return wrapper
 
     return decorator

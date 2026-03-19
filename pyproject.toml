@@ -28,7 +28,7 @@ keywords = [
   "kungfu",
 ]
 dependencies = [
-    "msgspex>=1.2.0",
+    "msgspex>=1.3.2",
 ]
 classifiers = [
     "Environment :: Console",
@@ -46,8 +46,8 @@ aiohttp = ["aiohttp"]
 
 [dependency-groups]
 dev = [
-    "ruff>=0.15.6,<1",
-    "basedpyright>=1.38.2,<2",
+    "ruff>=0.15.7,<1",
+    "basedpyright>=1.38.3,<2",
     "pre-commit>=4.5.1,<5",
     "pytest>=9.0.2",
     "pytest-asyncio>=1.3.0",

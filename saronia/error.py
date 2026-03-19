@@ -8,7 +8,18 @@ from reprlib import recursive_repr
 if typing.TYPE_CHECKING:
     from saronia.auth import AuthError
 
-type BaseError = AuthError | NetworkError | UnknownError
+type BaseError = AuthError | STATUS_ERROR | NetworkError | UnknownError
+
+STATUS_ERROR: typing.Final = type("StatusError", (Exception,), {"__module__": __name__})
+
+
+def status(code: int, description: str = "", /) -> tuple[HTTPStatus, str]:
+    http_status = HTTPStatus(code)
+    return (http_status, description or http_status.description)
+
+
+def status_error(code: int, description: str = "", /) -> BaseStatusError:
+    return StatusError[status(code, description)]  # type: ignore
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -33,39 +44,46 @@ class NetworkError(Exception):
         return self.message
 
 
-class StatusError:
-    """Usage:
-    ```python
-    class NotFoundError(Model, StatusError[HTTPStatus.NOT_FOUND]):
-        message: str
+class BaseStatusError:
+    _errors: dict[HTTPStatus, STATUS_ERROR]
 
-    class ValidationError(Model, StatusError[HTTPStatus.BAD_REQUEST, HTTPStatus.UNPROCESSABLE_ENTITY]):
-        message: str
-        details: dict[str, list[str]]
-    ```
-    """
+    @classmethod
+    def get_status_error(cls, status: HTTPStatus, /) -> STATUS_ERROR | None:
+        return cls._errors.get(status)
 
+
+class StatusError(STATUS_ERROR):
     if typing.TYPE_CHECKING:
         STATUSES: typing.ClassVar[tuple[HTTPStatus, ...]]
-    else:
-        STATUSES = ()
 
-    def __class_getitem__(cls, statuses: HTTPStatus | tuple[HTTPStatus, ...], /) -> typing.Any:
-        return type(
-            cls.__name__,
-            (),
-            {
-                "STATUSES": (statuses,) if not isinstance(statuses, tuple) else statuses,
-                "__module__": cls.__module__,
-            },
-        )
+    def __class_getitem__(
+        cls,
+        statuses: HTTPStatus | tuple[HTTPStatus, ...] | tuple[tuple[HTTPStatus, str], ...],
+        /,
+    ) -> typing.Any:
+        statuses = (statuses,) if not isinstance(statuses, tuple) else statuses
+
+        if statuses and (isinstance(statuses[0], tuple)) or (len(statuses) == 2 and isinstance(statuses[0], HTTPStatus) and isinstance(statuses[1], str)):
+            statuses_with_descriptions = ((statuses[0], statuses[1]),) if len(statuses) == 2 and not isinstance(statuses[0], tuple) else statuses
+            return type(
+                cls.__name__,
+                (BaseStatusError,),
+                {
+                    "_errors": {
+                        http_status: StatusError(description)
+                        for http_status, description in typing.cast("tuple[tuple[HTTPStatus, str]]", statuses_with_descriptions)
+                    },
+                },
+            )
+
+        return type(cls.__name__ + "Mixin", (), {"STATUSES": statuses, "__module__": cls.__module__})
 
 
 class APIError[Error = typing.Never](Exception):
     """Represents an API error response.
 
     Attributes:
-        error: The parsed error object (can be a Model, dict, bytes, or None)
+        error: The parsed error object
         method: The HTTP method that was used
         status: The HTTP status code returned
         path: The request path (optional)
@@ -110,4 +128,4 @@ class APIError[Error = typing.Never](Exception):
         return f"<{' '.join(parts)}>"
 
 
-__all__ = ("APIError", "NetworkError", "StatusError", "UnknownError")
+__all__ = ("APIError", "NetworkError", "StatusError", "UnknownError", "status", "status_error")

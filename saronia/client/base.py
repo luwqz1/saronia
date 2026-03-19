@@ -6,18 +6,20 @@ import typing
 from contextlib import suppress
 from http import HTTPMethod, HTTPStatus
 
-from kungfu import Error, Option, Result
+from kungfu import Error, Option
 from msgspex import decoder
 
 from saronia.__meta__ import __version__
+from saronia.auth import AuthError
 from saronia.client.abc import ABCClient, MultipartFile
-from saronia.error import APIError, StatusError, UnknownError
+from saronia.error import STATUS_ERROR, APIError, BaseStatusError, NetworkError, UnknownError
 
 if typing.TYPE_CHECKING:
     from _typeshed import DataclassInstance
 
     from saronia.auth import Auth, AuthComposite
 
+_SENTINEL: typing.Final = object()
 DEFAULT_TIMEOUT: typing.Final = 30.0
 DEFAULT_USER_AGENT: typing.Final = "CPython/{py_major}.{py_minor}; ({system}; {platform}) {saronia} {http_client}".format(
     py_major=sys.version_info.major,
@@ -52,6 +54,7 @@ class BaseClient(ABCClient, abc.ABC):
         path: str,
         method: HTTPMethod,
         *,
+        as_result: bool,
         errors: tuple[typing.Any, ...],
         response_type: Option[typing.Any],
         json: Option[str | bytes],
@@ -61,10 +64,56 @@ class BaseClient(ABCClient, abc.ABC):
         body: Option[typing.Any],
         files: Option[typing.Mapping[str, MultipartFile]],
         auth: typing.Any = None,
-    ) -> Result[typing.Any, APIError[typing.Any]]:
+    ) -> typing.Any:
         pass
 
-    def _to_api_error(
+    def _handle_error(
+        self,
+        status: HTTPStatus | None,
+        method: HTTPMethod,
+        path: str,
+        request_id: str | None,
+        exception: BaseException,
+        /,
+        *http_errors: type[BaseException],
+        as_result: bool = False,
+    ) -> Error[APIError[typing.Any]]:
+        api_error_kwargs: dict[str, typing.Any] = dict(
+            method=method,
+            path=path,
+            request_id=request_id,
+        )
+
+        if isinstance(exception, http_errors):
+            error = APIError(
+                error=NetworkError("Network issue", exception),
+                status=status or HTTPStatus.BAD_REQUEST,
+                **api_error_kwargs,
+            )
+
+        elif isinstance(exception, (AuthError, STATUS_ERROR)):
+            error = APIError(
+                error=exception,
+                status=status or HTTPStatus.NETWORK_AUTHENTICATION_REQUIRED,
+                **api_error_kwargs,
+            )
+
+        elif isinstance(exception, APIError):
+            error = exception  # type: ignore
+
+        else:
+            error = APIError(
+                error=UnknownError(b"", exception),
+                status=status or HTTPStatus.BAD_REQUEST,
+                **api_error_kwargs,
+            )
+
+        if as_result:
+            return Error(error)
+
+        raise error
+
+    def _raise_error(
         self,
         path: str,
         method: HTTPMethod,
@@ -72,17 +121,31 @@ class BaseClient(ABCClient, abc.ABC):
         payload: bytes,
         errors: tuple[typing.Any, ...],
         request_id: str | None = None,
-    ) -> Error[APIError[typing.Any]]:
-        if payload:
-            for error_type in errors:
-                if isinstance(error_type, StatusError) and status not in error_type.STATUSES:
+    ) -> typing.NoReturn:
+        for error_type in errors:
+            if isinstance(error_type, type) and issubclass(error_type, BaseStatusError):
+                status_error = error_type.get_status_error(status)
+
+                if status_error is not None:
+                    raise status_error
+
+                continue
+
+            if payload:
+                statuses = getattr(error_type, "STATUSES", ())
+
+                if statuses and status not in statuses:
                     continue
+
+                error_obj = _SENTINEL
 
                 with suppress(Exception):
                     error_obj = decoder.decode(payload, type=error_type)
-                    return Error(APIError(error_obj, method, status, path=path, request_id=request_id))
 
-        return Error(APIError(UnknownError(payload), method, status, path=path, request_id=request_id))
+                if error_obj is not _SENTINEL:
+                    raise APIError(error_obj, method, status, path=path, request_id=request_id)
+
+        raise APIError(UnknownError(payload), method, status, path=path, request_id=request_id)
 
     def _apply_auth(
         self,

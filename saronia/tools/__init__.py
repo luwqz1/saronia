@@ -9,6 +9,7 @@ __all__ = (
     "AsyncStream",
     "BytesBody",
     "BytesIO",
+    "Deprecated",
     "FileBinary",
     "FileBuffer",
     "FileIO",

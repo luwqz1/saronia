@@ -2,9 +2,7 @@ import abc
 import typing
 from http import HTTPMethod
 
-from kungfu import Option, Result
-
-from saronia.error import APIError
+from kungfu import Option
 
 if typing.TYPE_CHECKING:
     from io import IOBase
@@ -35,6 +33,7 @@ class ABCClient(abc.ABC):
         path: str,
         method: HTTPMethod,
         *,
+        as_result: bool,
         errors: tuple[typing.Any, ...],
         response_type: Option[typing.Any],
         json: Option[str | bytes],
@@ -44,7 +43,7 @@ class ABCClient(abc.ABC):
         body: Option[typing.Any],
         files: Option[typing.Mapping[str, MultipartFile]],
         auth: typing.Any = None,
-    ) -> Result[typing.Any, APIError[typing.Any]]:
+    ) -> typing.Any:
         pass
 
 

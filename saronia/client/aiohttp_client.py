@@ -3,13 +3,11 @@
 import typing
 from http import HTTPMethod, HTTPStatus
 
-from kungfu import Error, Ok, Option, Result
+from kungfu import Ok, Option
 from kungfu.library.monad.option import NOTHING
 from msgspex import decoder, encoder
 
-from saronia.auth import AuthError
-from saronia.client.base import DEFAULT_USER_AGENT, BaseClient, MultipartFile
-from saronia.error import APIError, NetworkError, UnknownError
+from saronia.client.base import DEFAULT_TIMEOUT, DEFAULT_USER_AGENT, BaseClient, MultipartFile
 
 if typing.TYPE_CHECKING:
     import aiohttp
@@ -21,7 +19,7 @@ class AiohttpClient(BaseClient):
         session: "aiohttp.ClientSession",
         *,
         user_agent: str | None = None,
-        request_timeout: float | None = None,
+        request_timeout: float = DEFAULT_TIMEOUT,
     ) -> None:
         from aiohttp import __version__
 
@@ -37,6 +35,7 @@ class AiohttpClient(BaseClient):
         path: str,
         method: HTTPMethod,
         *,
+        as_result: bool,
         errors: tuple[typing.Any, ...],
         response_type: Option[typing.Any],
         json: Option[str | bytes],
@@ -46,10 +45,12 @@ class AiohttpClient(BaseClient):
         body: Option[typing.Any],
         files: Option[typing.Mapping[str, MultipartFile]],
         auth: typing.Any = None,
-    ) -> Result[typing.Any, APIError[typing.Any]]:
+    ) -> typing.Any:
         import aiohttp
         import aiohttp.client_exceptions
         import aiohttp.http_exceptions
+
+        status = request_id = None
 
         try:
             kwargs: dict[str, typing.Any] = {
@@ -94,42 +95,30 @@ class AiohttpClient(BaseClient):
                 if 200 <= resp.status < 300:
                     return Ok(decoder.decode(await resp.read(), type=response_type.unwrap_or(typing.Any)))
 
-                return self._to_api_error(
+                status = HTTPStatus(resp.status)
+                request_id = resp.headers.get("X-Request-ID") or resp.headers.get("Request-ID")
+
+                self._raise_error(
                     path,
                     method,
-                    status=HTTPStatus(resp.status),
+                    status=status,
                     payload=await resp.read(),
                     errors=errors,
-                    request_id=resp.headers.get("X-Request-ID") or resp.headers.get("Request-ID"),
+                    request_id=request_id,
                 )
         except SystemExit, KeyboardInterrupt:
             raise
-        except (aiohttp.client_exceptions.ClientError, aiohttp.http_exceptions.HttpProcessingError) as error:
-            return Error(
-                APIError(
-                    NetworkError("AIOHTTP network error occurred", error),
-                    method,
-                    status=HTTPStatus.BAD_REQUEST,
-                    path=path,
-                ),
-            )
-        except AuthError as error:
-            return Error(
-                APIError(
-                    error,
-                    method,
-                    status=HTTPStatus.FORBIDDEN,
-                    path=path,
-                ),
-            )
-        except BaseException as exc:
-            return Error(
-                APIError(
-                    UnknownError(b"", orig_error=exc),
-                    method,
-                    status=HTTPStatus.BAD_REQUEST,
-                    path=path,
-                ),
+        except BaseException as exception:
+            return self._handle_error(
+                status,
+                method,
+                path,
+                request_id,
+                exception,
+                TimeoutError,
+                aiohttp.client_exceptions.ClientError,
+                aiohttp.http_exceptions.HttpProcessingError,
+                as_result=as_result,
             )
 
 

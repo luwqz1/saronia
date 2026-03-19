@@ -5,12 +5,10 @@ import typing
 from http import HTTPMethod, HTTPStatus
 from io import IOBase
 
-from kungfu import Error, Ok, Option, Result
+from kungfu import Ok, Option
 from msgspex import decoder, encoder
 
-from saronia.auth import AuthError
 from saronia.client.base import DEFAULT_TIMEOUT, DEFAULT_USER_AGENT, BaseClient, MultipartFile
-from saronia.error import APIError, NetworkError, UnknownError
 
 if typing.TYPE_CHECKING:
     import rnet
@@ -46,6 +44,7 @@ class RnetClient(BaseClient):
         path: str,
         method: HTTPMethod,
         *,
+        as_result: bool = False,
         errors: tuple[typing.Any, ...],
         response_type: Option[typing.Any],
         json: Option[str | bytes],
@@ -55,11 +54,12 @@ class RnetClient(BaseClient):
         body: Option[typing.Any],
         files: Option[typing.Mapping[str, MultipartFile]],
         auth: typing.Any = None,
-    ) -> Result[typing.Any, APIError[typing.Any]]:
+    ) -> typing.Any:
         import rnet
         import rnet.exceptions
 
         url = f"{self.base_url}{path}" if self.base_url else path
+        status = request_id = None
 
         try:
             kwargs: dict[str, typing.Any] = {
@@ -114,56 +114,39 @@ class RnetClient(BaseClient):
             )
 
             if 200 <= resp.status.as_int() < 300:
-                return Ok(decoder.decode(await resp.bytes(), type=response_type.unwrap_or(typing.Any)))
+                response = decoder.decode(await resp.bytes(), type=response_type.unwrap_or(typing.Any))
+                return Ok(response) if as_result else response
 
-            request_id = resp.headers.get("x-request-id") or resp.headers.get("request-id")
-            request_id = None if not request_id else request_id.decode()
-            return self._to_api_error(
+            status = HTTPStatus(resp.status.as_int())
+            request_id = None if not (req_id := resp.headers.get("x-request-id") or resp.headers.get("request-id")) else req_id.decode()
+
+            self._raise_error(
                 path,
                 method,
-                status=HTTPStatus(resp.status.as_int()),
+                status=status,
                 payload=await resp.bytes(),
                 errors=errors,
                 request_id=request_id,
             )
         except SystemExit, KeyboardInterrupt:
             raise
-        except (
-            rnet.exceptions.ConnectionError,
-            rnet.exceptions.ConnectionResetError,
-            rnet.exceptions.ProxyConnectionError,
-            rnet.exceptions.RequestError,
-            rnet.exceptions.TimeoutError,
-            rnet.exceptions.RustPanic,
-            rnet.exceptions.TlsError,
-            rnet.exceptions.BodyError,
-            rnet.exceptions.RedirectError,
-        ) as error:
-            return Error(
-                APIError(
-                    NetworkError("RNET network error occurred", error),
-                    method,
-                    status=HTTPStatus.BAD_REQUEST,
-                    path=path,
-                ),
-            )
-        except AuthError as error:
-            return Error(
-                APIError(
-                    error,
-                    method,
-                    status=HTTPStatus.FORBIDDEN,
-                    path=path,
-                ),
-            )
-        except BaseException as exc:
-            return Error(
-                APIError(
-                    UnknownError(b"", orig_error=exc),
-                    method,
-                    status=HTTPStatus.BAD_REQUEST,
-                    path=path,
-                ),
+        except BaseException as exception:
+            return self._handle_error(
+                status,
+                method,
+                path,
+                request_id,
+                exception,
+                rnet.exceptions.ConnectionError,
+                rnet.exceptions.ConnectionResetError,
+                rnet.exceptions.ProxyConnectionError,
+                rnet.exceptions.RequestError,
+                rnet.exceptions.TimeoutError,
+                rnet.exceptions.RustPanic,
+                rnet.exceptions.TlsError,
+                rnet.exceptions.BodyError,
+                rnet.exceptions.RedirectError,
+                as_result=as_result,
             )
 
 

@@ -20,8 +20,8 @@ def create_model_from_function_signature(func: typing.Callable[..., typing.Any],
         name: str | None = None
 
         if isinstance(annotation, Param):  # type: ignore
-            annotation = annotation.to_annotated()  # type: ignore
             name = getattr(annotation, "name")
+            annotation = annotation.to_annotated(parameter.name, func.__name__)  # type: ignore
 
         annotations[parameter.name] = annotation
         fields[parameter.name] = msgspec.field(

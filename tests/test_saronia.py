@@ -18,7 +18,7 @@ from msgspex import Model
 
 import saronia
 from saronia import API, AiohttpClient, APIResult, RnetClient, delete, get, patch, post, put
-from saronia.error import UnknownError
+from saronia.error import StatusError, UnknownError, status
 from saronia.security import (
     CookieAPIKey,
     HeaderAPIKey,
@@ -141,6 +141,11 @@ async def server_error_422():
 @app.get("/errors/500")
 async def server_error_500():
     return JSONResponse({"message": "internal server error"}, status_code=500)
+
+
+@app.get("/errors/502")
+async def server_error_502():
+    return Response(status_code=502)
 
 
 @app.get("/errors/empty")
@@ -387,6 +392,9 @@ class AiohttpErrorsController:
     @get("/500")
     async def get_500(self) -> APIResult[None, ErrorMessage]: ...
 
+    @get("/502")
+    async def get_502(self) -> APIResult[None, StatusError[status(502, "bad gateway :(")]]: ...
+
     @get("/empty")
     async def get_empty(self) -> APIResult[None, ErrorMessage]: ...
 
@@ -532,6 +540,9 @@ class RnetErrorsController:
 
     @get("/500")
     async def get_500(self) -> APIResult[None, ErrorMessage]: ...
+
+    @get("/502")
+    async def get_502(self) -> APIResult[None, StatusError[status(502, "bad gateway :(")]]: ...
 
     @get("/empty")
     async def get_empty(self) -> APIResult[None, ErrorMessage]: ...
@@ -877,6 +888,14 @@ class TestAiohttpErrors:
         assert isinstance(err.error, ErrorMessage)
 
     @pytest.mark.asyncio
+    async def test_502_status_error(self, aiohttp_errors):
+        err = assert_error(await aiohttp_errors.get_502())
+        assert err.status == HTTPStatus.BAD_GATEWAY
+        assert err.status.is_server_error
+        assert not err.status.is_client_error
+        assert isinstance(err.error, StatusError)
+
+    @pytest.mark.asyncio
     async def test_empty_body_error_is_none(self, aiohttp_errors):
         err = assert_error(await aiohttp_errors.get_empty())
         assert err.status == HTTPStatus.NOT_FOUND
@@ -1077,6 +1096,14 @@ class TestRnetErrors:
         assert err.status.is_server_error
 
     @pytest.mark.asyncio
+    async def test_502_status_error(self, aiohttp_errors):
+        err = assert_error(await aiohttp_errors.get_502())
+        assert err.status == HTTPStatus.BAD_GATEWAY
+        assert err.status.is_server_error
+        assert not err.status.is_client_error
+        assert isinstance(err.error, StatusError)
+
+    @pytest.mark.asyncio
     async def test_empty_body_error_is_none(self, rnet_errors):
         err = assert_error(await rnet_errors.get_empty())
         assert err.status == HTTPStatus.NOT_FOUND
@@ -1160,19 +1187,6 @@ class TestRouteDecoratorValidation:
 
             @saronia.get("/test")  # type: ignore
             def sync_method(self) -> APIResult[None, None]:  # type: ignore
-                ...
-
-    def test_missing_return_annotation_raises(self):
-        with pytest.raises(TypeError, match="return type"):
-
-            @saronia.get("/test")  # type: ignore
-            async def no_return(self): ...
-
-    def test_non_result_return_type_raises(self):
-        with pytest.raises(TypeError, match="return type"):
-
-            @saronia.get("/test")  # type: ignore
-            async def wrong_return(self) -> dict:  # type: ignore
                 ...
 
     def test_json_and_urlencoded_conflict_raises(self):
