@@ -1,16 +1,20 @@
-<p>
-  <a href="https://github.com/luwqz1/saronia">
-    <picture>
-      <img alt="Logo" src="https://raw.githubusercontent.com/luwqz1/saronia/main/assets/logo.svg" width="200">
-    </picture>
-  </a>
-</p>
+<div align="center">
+  <p>
+    <a href="https://github.com/luwqz1/saronia">
+      <picture>
+        <img alt="Logo" src="https://raw.githubusercontent.com/luwqz1/saronia/main/assets/logo.svg" width="200">
+      </picture>
+    </a>
+  </p>
 
-<h1>
-  saronia
-</h1>
+  <h1>saronia</h1>
 
-A lightweight, spec-driven builder for API clients and controllers.
+  <p>
+    A lightweight, spec-driven builder for API clients and controllers.
+  </p>
+</div>
+
+## Features
 
 - Declarative API controller syntax
 - Type-safe request/response handling
