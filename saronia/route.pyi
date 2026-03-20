@@ -20,62 +20,145 @@ type RouteDecorator[**P, R] = typing.Callable[[typing.Callable[P, CoroutineType[
 @typing.overload
 def route[**P, R](method: HTTPMethod, path: str, /) -> RouteDecorator[P, R]: ...
 @typing.overload
-def route[**P, R](
-    method: HTTPMethod,
-    path: str,
-    /,
-    *errors: typing.Any,
-) -> RouteDecorator[P, R]: ...
-@typing.overload
-def route[**P, R](
-    method: HTTPMethod,
-    path: str,
-    /,
-    *,
-    auth: Authorization | None = ...,
-) -> RouteDecorator[P, R]: ...
-@typing.overload
-def route[**P, R](
-    method: HTTPMethod,
-    path: str,
-    /,
-    *errors: typing.Any,
-    auth: Authorization | None = ...,
-) -> RouteDecorator[P, R]: ...
-@typing.overload
 def route[**P, **X, C, R](
     method: HTTPMethod,
-    path: str,
-    form: typing.Callable[P, Model],
-    /,
-    *,
-    auth: Authorization | None = ...,
-) -> typing.Callable[
-    [typing.Callable[typing.Concatenate[C, X], CoroutineType[R]]],
-    typing.Callable[typing.Concatenate[C, P], CoroutineType[R]],
-]: ...
-@typing.overload
-def route[**P, **X, C, R](
-    method: HTTPMethod,
-    path: str,
+    __path: str,
     form: typing.Callable[P, Model],
     /,
     *errors: typing.Any,
-    auth: Authorization | None = ...,
-) -> typing.Callable[
-    [typing.Callable[typing.Concatenate[C, X], CoroutineType[R]]],
-    typing.Callable[typing.Concatenate[C, P], CoroutineType[R]],
-]: ...
-@typing.overload
-def route[**P, R](
-    method: HTTPMethod,
-    path: str,
-    form: typing.Callable[P, Model],
-    /,
-    *errors: typing.Any,
-    auth: Authorization | None = ...,
+    path: bool = True,
     response: type[R] = ...,
-) -> RouteDecorator[P, R]: ...
+    auth: Authorization | None = ...,
+) -> typing.Callable[
+    [typing.Callable[typing.Concatenate[C, X], CoroutineType[R]]],
+    typing.Callable[typing.Concatenate[C, P], CoroutineType[R]],
+]: ...
+@typing.overload
+def route[**P, **X, C, R](
+    method: HTTPMethod,
+    __path: str,
+    /,
+    *errors: typing.Any,
+    form: typing.Callable[P, Model],
+    path: bool = True,
+    response: type[R] = ...,
+    auth: Authorization | None = ...,
+) -> typing.Callable[
+    [typing.Callable[typing.Concatenate[C, X], CoroutineType[R]]],
+    typing.Callable[typing.Concatenate[C, P], CoroutineType[R]],
+]: ...
+@typing.overload
+def route[**P, **X, C, R](
+    method: HTTPMethod,
+    __path: str,
+    form: typing.Callable[P, Model],
+    /,
+    *errors: typing.Any,
+    query: bool,
+    response: type[R] = ...,
+    auth: Authorization | None = ...,
+) -> typing.Callable[
+    [typing.Callable[typing.Concatenate[C, X], CoroutineType[R]]],
+    typing.Callable[typing.Concatenate[C, P], CoroutineType[R]],
+]: ...
+@typing.overload
+def route[**P, **X, C, R](
+    method: HTTPMethod,
+    __path: str,
+    /,
+    *errors: typing.Any,
+    form: typing.Callable[P, Model],
+    query: bool,
+    response: type[R] = ...,
+    auth: Authorization | None = ...,
+) -> typing.Callable[
+    [typing.Callable[typing.Concatenate[C, X], CoroutineType[R]]],
+    typing.Callable[typing.Concatenate[C, P], CoroutineType[R]],
+]: ...
+@typing.overload
+def route[**P, **X, C, R](
+    method: HTTPMethod,
+    __path: str,
+    form: typing.Callable[P, Model],
+    /,
+    *errors: typing.Any,
+    header: bool,
+    response: type[R] = ...,
+    auth: Authorization | None = ...,
+) -> typing.Callable[
+    [typing.Callable[typing.Concatenate[C, X], CoroutineType[R]]],
+    typing.Callable[typing.Concatenate[C, P], CoroutineType[R]],
+]: ...
+@typing.overload
+def route[**P, **X, C, R](
+    method: HTTPMethod,
+    __path: str,
+    /,
+    *errors: typing.Any,
+    form: typing.Callable[P, Model],
+    header: bool,
+    response: type[R] = ...,
+    auth: Authorization | None = ...,
+) -> typing.Callable[
+    [typing.Callable[typing.Concatenate[C, X], CoroutineType[R]]],
+    typing.Callable[typing.Concatenate[C, P], CoroutineType[R]],
+]: ...
+@typing.overload
+def route[**P, **X, C, R](
+    method: HTTPMethod,
+    __path: str,
+    form: typing.Callable[P, Model],
+    /,
+    *errors: typing.Any,
+    json: bool,
+    response: type[R] = ...,
+    auth: Authorization | None = ...,
+) -> typing.Callable[
+    [typing.Callable[typing.Concatenate[C, X], CoroutineType[R]]],
+    typing.Callable[typing.Concatenate[C, P], CoroutineType[R]],
+]: ...
+@typing.overload
+def route[**P, **X, C, R](
+    method: HTTPMethod,
+    __path: str,
+    /,
+    *errors: typing.Any,
+    form: typing.Callable[P, Model],
+    json: bool,
+    response: type[R] = ...,
+    auth: Authorization | None = ...,
+) -> typing.Callable[
+    [typing.Callable[typing.Concatenate[C, X], CoroutineType[R]]],
+    typing.Callable[typing.Concatenate[C, P], CoroutineType[R]],
+]: ...
+@typing.overload
+def route[**P, **X, C, R](
+    method: HTTPMethod,
+    __path: str,
+    form: typing.Callable[P, Model],
+    /,
+    *errors: typing.Any,
+    urlencoded: bool,
+    response: type[R] = ...,
+    auth: Authorization | None = ...,
+) -> typing.Callable[
+    [typing.Callable[typing.Concatenate[C, X], CoroutineType[R]]],
+    typing.Callable[typing.Concatenate[C, P], CoroutineType[R]],
+]: ...
+@typing.overload
+def route[**P, **X, C, R](
+    method: HTTPMethod,
+    __path: str,
+    /,
+    *errors: typing.Any,
+    form: typing.Callable[P, Model],
+    urlencoded: bool,
+    response: type[R] = ...,
+    auth: Authorization | None = ...,
+) -> typing.Callable[
+    [typing.Callable[typing.Concatenate[C, X], CoroutineType[R]]],
+    typing.Callable[typing.Concatenate[C, P], CoroutineType[R]],
+]: ...
 @typing.overload
 def route[**P, R](
     method: HTTPMethod,
@@ -102,7 +185,7 @@ def route[**P, R](
     path: str,
     /,
     *errors: typing.Any,
-    headers: bool,
+    header: bool,
     auth: Authorization | None = ...,
     response: type[R] = ...,
 ) -> RouteDecorator[P, R]: ...

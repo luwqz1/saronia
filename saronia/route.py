@@ -395,9 +395,10 @@ def route_deprecated(
 def route(
     method: HTTPMethod,
     __path: str,
-    form: type[msgspex.Model] | None = None,
+    _form: type[msgspex.Model] | None = None,
     /,
     *errors: typing.Any,
+    form: type[msgspex.Model] | None = None,
     auth: typing.Any = _NOAUTH,
     response: typing.Any = _NORESPONSE,
     path: bool = True,
@@ -425,6 +426,9 @@ def route(
         nonlocal form_spec, _errors, response, as_result
 
         if sig.has_return_type and (typing.get_origin(sig.return_type) or sig.return_type in (APIResult, kungfu.Result)):
+            if form is None and _form is not None:
+                form_spec = _create_form_spec(__path, _form)
+
             if len(typing.get_args(sig.return_type)) == 2:
                 as_result = True
                 resp, error = typing.get_args(sig.return_type)
@@ -436,9 +440,15 @@ def route(
                 resp = response
 
             response = resp if response is _NORESPONSE else response
+        else:
+            if sig.has_return_type:
+                response = sig.return_type
 
-        elif sig.has_return_type:
-            response = sig.return_type
+            if _form is not None and form is not None:
+                _errors = (_form,) + _errors
+
+            elif form is None and _form is not None:
+                form_spec = _create_form_spec(__path, _form)
 
         if form_spec is None:
             form_spec = _create_form_spec(
