@@ -5,8 +5,8 @@ import typing
 from http import HTTPMethod, HTTPStatus
 from io import IOBase
 
-from kungfu import Ok, Option
-from msgspex import decoder, encoder
+from kungfu import Option
+from msgspex import encoder
 
 from saronia.client.base import DEFAULT_TIMEOUT, DEFAULT_USER_AGENT, BaseClient, MultipartFile
 
@@ -112,21 +112,18 @@ class RnetClient(BaseClient):
                 timeout=self.request_timeout,
                 **kwargs,
             )
+            payload = await resp.bytes()
 
             if 200 <= resp.status.as_int() < 300:
-                response = decoder.decode(await resp.bytes(), type=response_type.unwrap_or(typing.Any))
-                return Ok(response) if as_result else response
-
-            status = HTTPStatus(resp.status.as_int())
-            request_id = None if not (req_id := resp.headers.get("x-request-id") or resp.headers.get("request-id")) else req_id.decode()
+                return self._validate_response(payload, response_type.unwrap_or(typing.Any), as_result=as_result)
 
             self._raise_error(
                 path,
                 method,
-                status=status,
-                payload=await resp.bytes(),
+                status=(status := HTTPStatus(resp.status.as_int())),
+                payload=payload,
                 errors=errors,
-                request_id=request_id,
+                request_id=(request_id := None if not (req_id := resp.headers.get("x-request-id") or resp.headers.get("request-id")) else req_id.decode()),
             )
         except SystemExit, KeyboardInterrupt:
             raise

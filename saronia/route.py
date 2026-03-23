@@ -201,15 +201,15 @@ def _get_form_spec(form_model: type[msgspex.Model], /) -> FormSpec:
 
         if parameter is None and is_decorated:
             if is_header(form_model):
-                header_parameters[field_name] = _to_header_name(field_name)
+                header_parameters[field_name] = _to_header_name(alias_name or field_alias_name or field_name)
             elif is_path(form_model):
-                path_parameters[field_name] = None
+                path_parameters[field_name] = alias_name or field_alias_name
             elif is_query(form_model):
-                query_parameters[field_name] = None
+                query_parameters[field_name] = alias_name or field_alias_name
             elif is_urlencoded(form_model):
-                urlencoded_parameters[field_name] = None
+                urlencoded_parameters[field_name] = alias_name or field_alias_name
             elif is_json(form_model):
-                json_parameters[field_name] = None
+                json_parameters[field_name] = alias_name or field_alias_name
 
         match parameter:
             case None:

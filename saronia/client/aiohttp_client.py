@@ -3,9 +3,9 @@
 import typing
 from http import HTTPMethod, HTTPStatus
 
-from kungfu import Ok, Option
+from kungfu import Option
 from kungfu.library.monad.option import NOTHING
-from msgspex import decoder, encoder
+from msgspex import encoder
 
 from saronia.client.base import DEFAULT_TIMEOUT, DEFAULT_USER_AGENT, BaseClient, MultipartFile
 
@@ -92,19 +92,18 @@ class AiohttpClient(BaseClient):
                 kwargs["data"] = form_data
 
             async with self.session.request(method.value, path, **kwargs) as resp:
-                if 200 <= resp.status < 300:
-                    return Ok(decoder.decode(await resp.read(), type=response_type.unwrap_or(typing.Any)))
+                content = await resp.read()
 
-                status = HTTPStatus(resp.status)
-                request_id = resp.headers.get("X-Request-ID") or resp.headers.get("Request-ID")
+                if 200 <= resp.status < 300:
+                    return self._validate_response(content, response_type.unwrap_or(typing.Any), as_result=True)
 
                 self._raise_error(
                     path,
                     method,
-                    status=status,
-                    payload=await resp.read(),
+                    status=(status := HTTPStatus(resp.status)),
+                    payload=content,
                     errors=errors,
-                    request_id=request_id,
+                    request_id=(request_id := resp.headers.get("X-Request-ID") or resp.headers.get("Request-ID")),
                 )
         except SystemExit, KeyboardInterrupt:
             raise

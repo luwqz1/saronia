@@ -6,7 +6,7 @@ import typing
 from contextlib import suppress
 from http import HTTPMethod, HTTPStatus
 
-from kungfu import Error, Option
+from kungfu import Error, Ok, Option
 from msgspex import decoder
 
 from saronia.__meta__ import __version__
@@ -19,6 +19,7 @@ if typing.TYPE_CHECKING:
 
     from saronia.auth import Auth, AuthComposite
 
+_NONE_TYPES: typing.Final = frozenset((None, type(None)))
 _SENTINEL: typing.Final = object()
 DEFAULT_TIMEOUT: typing.Final = 30.0
 DEFAULT_USER_AGENT: typing.Final = "CPython/{py_major}.{py_minor}; ({system}; {platform}) {saronia} {http_client}".format(
@@ -66,6 +67,15 @@ class BaseClient(ABCClient, abc.ABC):
         auth: typing.Any = None,
     ) -> typing.Any:
         pass
+
+    def _validate_response(
+        self,
+        payload: bytes,
+        response_type: typing.Any,
+        as_result: bool = False,
+    ) -> typing.Any:
+        response = None if response_type in _NONE_TYPES else decoder.decode(payload, type=response_type)
+        return Ok(response) if as_result else response
 
     def _handle_error(
         self,

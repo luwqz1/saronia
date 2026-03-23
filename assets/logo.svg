@@ -7,7 +7,9 @@
 
   <path d="M58 72H112V120H170" stroke="#E2E8F0" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/>
   <path d="M112 120V172H170" stroke="#38BDF8" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M160 62L182 84L160 106" stroke="#38BDF8" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <path d="M170 120V72" stroke="#38BDF8" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M148 94L170 72L192 94" stroke="#38BDF8" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/>
 
   <circle cx="58" cy="72" r="12" fill="#E2E8F0"/>
   <rect x="100" y="108" width="24" height="24" rx="7" fill="#E2E8F0"/>
