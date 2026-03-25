@@ -9,7 +9,7 @@ import pytest_asyncio
 import uvicorn
 from fastapi import FastAPI, Header, HTTPException
 
-from saronia import API, APIResult, HeaderAPIKey, HTTPBearer, StatusError, get
+from saronia import API, APIResult, HeaderAPIKey, HTTPBearer, ModelStatusError, get
 from saronia.client.aiohttp_client import AiohttpClient
 
 
@@ -64,7 +64,7 @@ class Response(msgspex.Model):
     message: str
 
 
-class ErrorResponse(msgspex.Model, StatusError[HTTPStatus.UNAUTHORIZED]):
+class ErrorResponse(msgspex.Model, ModelStatusError[HTTPStatus.UNAUTHORIZED]):
     detail: str
 
 

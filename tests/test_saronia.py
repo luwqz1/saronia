@@ -18,7 +18,7 @@ from msgspex import Model
 
 import saronia
 from saronia import API, AiohttpClient, APIResult, RnetClient, delete, get, patch, post, put
-from saronia.error import StatusError, UnknownError, status
+from saronia.error import StatusError, UnknownError
 from saronia.security import (
     CookieAPIKey,
     HeaderAPIKey,
@@ -259,6 +259,10 @@ class OkResponse(Model):
     ok: bool
 
 
+class BadGatewayError(StatusError[502]):
+    """Something went wrong."""
+
+
 aiohttp_api = API.endpoint("")
 
 
@@ -393,7 +397,7 @@ class AiohttpErrorsController:
     async def get_500(self) -> APIResult[None, ErrorMessage]: ...
 
     @get("/502")
-    async def get_502(self) -> APIResult[None, StatusError[status(502, "bad gateway :(")]]: ...
+    async def get_502(self) -> APIResult[None, BadGatewayError]: ...
 
     @get("/empty")
     async def get_empty(self) -> APIResult[None, ErrorMessage]: ...
@@ -542,7 +546,7 @@ class RnetErrorsController:
     async def get_500(self) -> APIResult[None, ErrorMessage]: ...
 
     @get("/502")
-    async def get_502(self) -> APIResult[None, StatusError[status(502, "bad gateway :(")]]: ...
+    async def get_502(self) -> APIResult[None, BadGatewayError]: ...
 
     @get("/empty")
     async def get_empty(self) -> APIResult[None, ErrorMessage]: ...
@@ -893,13 +897,14 @@ class TestAiohttpErrors:
         assert err.status == HTTPStatus.BAD_GATEWAY
         assert err.status.is_server_error
         assert not err.status.is_client_error
-        assert isinstance(err.error, StatusError)
+        assert isinstance(err.error, BadGatewayError)
 
     @pytest.mark.asyncio
     async def test_empty_body_error_is_none(self, aiohttp_errors):
         err = assert_error(await aiohttp_errors.get_empty())
         assert err.status == HTTPStatus.NOT_FOUND
         assert isinstance(err.error, UnknownError)
+        assert not err.error.payload
 
     @pytest.mark.asyncio
     async def test_error_carries_http_method(self, aiohttp_errors):
@@ -1101,13 +1106,14 @@ class TestRnetErrors:
         assert err.status == HTTPStatus.BAD_GATEWAY
         assert err.status.is_server_error
         assert not err.status.is_client_error
-        assert isinstance(err.error, StatusError)
+        assert isinstance(err.error, BadGatewayError)
 
     @pytest.mark.asyncio
     async def test_empty_body_error_is_none(self, rnet_errors):
         err = assert_error(await rnet_errors.get_empty())
         assert err.status == HTTPStatus.NOT_FOUND
         assert isinstance(err.error, UnknownError)
+        assert not err.error.payload
 
     @pytest.mark.asyncio
     async def test_error_carries_http_method(self, rnet_errors):
@@ -1162,16 +1168,6 @@ class TestAPIErrorUnit:
     def test_stores_path(self):
         err = saronia.APIError(None, HTTPMethod.GET, HTTPStatus.NOT_FOUND, path="/items/99")
         assert err.path == "/items/99"
-
-    def test_network_error_str_with_original(self):
-        orig = ValueError("connection refused")
-        ne = saronia.NetworkError("Network failed", orig)
-        assert "Network failed" in str(ne)
-        assert "connection refused" in str(ne)
-
-    def test_network_error_str_without_original(self):
-        ne = saronia.NetworkError("Timeout")
-        assert str(ne) == "Timeout"
 
 
 class TestRouteDecoratorValidation:

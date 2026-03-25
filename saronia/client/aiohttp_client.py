@@ -105,8 +105,6 @@ class AiohttpClient(BaseClient):
                     errors=errors,
                     request_id=(request_id := resp.headers.get("X-Request-ID") or resp.headers.get("Request-ID")),
                 )
-        except SystemExit, KeyboardInterrupt:
-            raise
         except BaseException as exception:
             return self._handle_error(
                 status,

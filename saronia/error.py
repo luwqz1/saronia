@@ -1,89 +1,98 @@
 from __future__ import annotations
 
-import dataclasses
 import typing
 from http import HTTPMethod, HTTPStatus
 from reprlib import recursive_repr
 
 if typing.TYPE_CHECKING:
+    from msgspec import ValidationError
+
     from saronia.auth import AuthError
 
-type BaseError = AuthError | STATUS_ERROR | NetworkError | UnknownError
-
-STATUS_ERROR: typing.Final = type("StatusError", (Exception,), {"__module__": __name__})
+    type BaseError = AuthError | ValidationError | NetworkError | UnknownError | UncaughtError
 
 
-def status(code: int, description: str = "", /) -> tuple[HTTPStatus, str]:
-    http_status = HTTPStatus(code)
-    return (http_status, description or http_status.description)
+class ModelStatusError:
+    if typing.TYPE_CHECKING:
+        STATUSES: typing.Final[tuple[HTTPStatus, ...]] = ()
+
+    def __class_getitem__(cls, items: HTTPStatus | tuple[HTTPStatus, ...], /) -> typing.Any:
+        return type(cls.__name__ + "Mixin", (), {"STATUSES": (items,) if not isinstance(items, tuple) else items, "__module__": cls.__module__})
 
 
-def status_error(code: int, description: str = "", /) -> BaseStatusError:
-    return StatusError[status(code, description)]  # type: ignore
+class StatusError(Exception):
+    description: typing.ClassVar[str]
+    status: typing.ClassVar[HTTPStatus]
+    error: typing.ClassVar[typing.Self]
 
+    def __init__(self, description: str, /) -> None:
+        super().__init__(description)
 
-@dataclasses.dataclass(frozen=True, slots=True)
-class UnknownError:
-    message: bytes
-    orig_error: BaseException | None = None
+    def __init_subclass__(cls) -> None:
+        cls.error = cls(cls.description)
+
+    def __class_getitem__(cls, item: typing.Any, /) -> typing.Any:
+        if not isinstance(item, int):
+            raise ValueError(f"Excepted value of `int` type, but value of `{type(item).__name__}` type were given.")
+
+        status = HTTPStatus(item)
+        description = cls.__doc__ or status.description
+        return type(
+            cls.__name__,
+            (StatusError,),
+            dict(description=description, status=status),
+        )
 
 
 class NetworkError(Exception):
-    """Raised when a network-level error occurs (connection failed, timeout, etc)."""
+    __match_args__ = ("network_exception",)
 
-    __match_args__ = ("message", "original_error")
+    def __init__(self, network_exception: BaseException) -> None:
+        super().__init__()
 
-    def __init__(self, message: str, original_error: BaseException | None = None) -> None:
-        self.message = message
-        self.original_error = original_error
-        super().__init__(message)
+        self.network_exception = network_exception
 
     def __str__(self) -> str:
-        if self.original_error:
-            return f"{self.message}: {self.original_error}"
-        return self.message
+        return self.__repr__()
+
+    def __repr__(self) -> str:
+        return "{}: There was a network issue of {}: {}".format(
+            type(self).__name__,
+            type(self.network_exception).__name__,
+            repr(self.network_exception),
+        )
 
 
-class BaseStatusError:
-    _errors: dict[HTTPStatus, STATUS_ERROR]
+class UncaughtError(Exception):
+    __match_args__ = ("uncaught_exception",)
 
-    @classmethod
-    def get_status_error(cls, status: HTTPStatus, /) -> STATUS_ERROR | None:
-        return cls._errors.get(status)
+    def __init__(self, uncaught_exception: BaseException | None = None) -> None:
+        super().__init__(uncaught_exception)
+
+        self.uncaught_exception = uncaught_exception
 
 
-class StatusError(STATUS_ERROR):
-    if typing.TYPE_CHECKING:
-        STATUSES: typing.ClassVar[tuple[HTTPStatus, ...]]
+class UnknownError(Exception):
+    __match_args__ = ("status", "payload")
 
-    def __class_getitem__(
-        cls,
-        statuses: HTTPStatus | tuple[HTTPStatus, ...] | tuple[tuple[HTTPStatus, str], ...],
-        /,
-    ) -> typing.Any:
-        statuses = (statuses,) if not isinstance(statuses, tuple) else statuses
+    def __init__(self, status: HTTPStatus, payload: bytes = b"") -> None:
+        super().__init__()
 
-        if statuses and (isinstance(statuses[0], tuple)) or (len(statuses) == 2 and isinstance(statuses[0], HTTPStatus) and isinstance(statuses[1], str)):
-            statuses_with_descriptions = ((statuses[0], statuses[1]),) if len(statuses) == 2 and not isinstance(statuses[0], tuple) else statuses
-            return type(
-                cls.__name__,
-                (BaseStatusError,),
-                {
-                    "_errors": {
-                        http_status: StatusError(description)
-                        for http_status, description in typing.cast("tuple[tuple[HTTPStatus, str]]", statuses_with_descriptions)
-                    },
-                },
-            )
+        self.status = status
+        self.payload = payload
 
-        return type(cls.__name__ + "Mixin", (), {"STATUSES": statuses, "__module__": cls.__module__})
+    def __str__(self) -> str:
+        return self.__repr__()
+
+    def __repr__(self) -> str:
+        return f"Unknown error with status code `{self.status.value}`, payload: {self.payload!r}"
 
 
 class APIError[Error = typing.Never](Exception):
     """Represents an API error response.
 
     Attributes:
-        error: The parsed error object
+        error: The error
         method: The HTTP method that was used
         status: The HTTP status code returned
         path: The request path (optional)
@@ -104,12 +113,13 @@ class APIError[Error = typing.Never](Exception):
         path: str | None = None,
         request_id: str | None = None,
     ) -> None:
+        super().__init__()
+
         self.error = error
         self.method = method
         self.status = status
         self.path = path
         self.request_id = request_id
-        super().__init__()
 
     def __str__(self) -> str:
         return self.__repr__()
@@ -128,4 +138,4 @@ class APIError[Error = typing.Never](Exception):
         return f"<{' '.join(parts)}>"
 
 
-__all__ = ("APIError", "NetworkError", "StatusError", "UnknownError", "status", "status_error")
+__all__ = ("APIError", "ModelStatusError", "NetworkError", "StatusError", "UncaughtError", "UnknownError")

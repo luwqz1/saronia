@@ -125,8 +125,6 @@ class RnetClient(BaseClient):
                 errors=errors,
                 request_id=(request_id := None if not (req_id := resp.headers.get("x-request-id") or resp.headers.get("request-id")) else req_id.decode()),
             )
-        except SystemExit, KeyboardInterrupt:
-            raise
         except BaseException as exception:
             return self._handle_error(
                 status,

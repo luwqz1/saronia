@@ -2,7 +2,7 @@
   <p>
     <a href="https://github.com/luwqz1/saronia">
       <picture>
-        <img alt="Logo" src="https://raw.githubusercontent.com/luwqz1/saronia/main/assets/logo.svg" width="125">
+        <img alt="Logo" src="https://raw.githubusercontent.com/luwqz1/saronia/main/assets/logo.svg" width="145">
       </picture>
     </a>
   </p>

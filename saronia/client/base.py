@@ -6,13 +6,14 @@ import typing
 from contextlib import suppress
 from http import HTTPMethod, HTTPStatus
 
+import msgspec
 from kungfu import Error, Ok, Option
 from msgspex import decoder
 
 from saronia.__meta__ import __version__
 from saronia.auth import AuthError
 from saronia.client.abc import ABCClient, MultipartFile
-from saronia.error import STATUS_ERROR, APIError, BaseStatusError, NetworkError, UnknownError
+from saronia.error import APIError, NetworkError, StatusError, UncaughtError, UnknownError
 
 if typing.TYPE_CHECKING:
     from _typeshed import DataclassInstance
@@ -70,11 +71,18 @@ class BaseClient(ABCClient, abc.ABC):
 
     def _validate_response(
         self,
-        payload: bytes,
+        payload: bytes | None,
         response_type: typing.Any,
         as_result: bool = False,
     ) -> typing.Any:
-        response = None if response_type in _NONE_TYPES else decoder.decode(payload, type=response_type)
+        if not payload:
+            if not (response_type is typing.Any or response_type in _NONE_TYPES):
+                raise msgspec.ValidationError("Payload is empty to validate.")
+
+            response = None
+        else:
+            response = decoder.decode(payload, type=response_type)
+
         return Ok(response) if as_result else response
 
     def _handle_error(
@@ -88,40 +96,42 @@ class BaseClient(ABCClient, abc.ABC):
         *http_errors: type[BaseException],
         as_result: bool = False,
     ) -> Error[APIError[typing.Any]]:
-        api_error_kwargs: dict[str, typing.Any] = dict(
-            method=method,
+        # Break a control flow if a raised exception is a singal to interrupt the program
+        if isinstance(exception, KeyboardInterrupt | SystemExit):
+            raise exception from None
+
+        if isinstance(exception, APIError):
+            if as_result:
+                return Error(exception)
+            raise exception from None
+
+        error = UncaughtError(uncaught_exception=exception)
+
+        if isinstance(exception, http_errors):
+            error = NetworkError(network_exception=exception)
+            status = status or HTTPStatus.FORBIDDEN
+        else:
+            match exception:
+                case msgspec.ValidationError() as error:
+                    status = status or HTTPStatus.PROCESSING
+                case AuthError() as error:
+                    status = status or HTTPStatus.UNAUTHORIZED
+                case StatusError() | UnknownError() as error:
+                    status = status or error.status
+                case _:
+                    pass
+
+        api_error = APIError[typing.Any](
+            error,
+            method,
+            status or HTTPStatus.BAD_REQUEST,
             path=path,
             request_id=request_id,
         )
 
-        if isinstance(exception, http_errors):
-            error = APIError(
-                error=NetworkError("Network issue", exception),
-                status=status or HTTPStatus.BAD_REQUEST,
-                **api_error_kwargs,
-            )
-
-        elif isinstance(exception, (AuthError, STATUS_ERROR)):
-            error = APIError(
-                error=exception,
-                status=status or HTTPStatus.NETWORK_AUTHENTICATION_REQUIRED,
-                **api_error_kwargs,
-            )
-
-        elif isinstance(exception, APIError):
-            error = exception  # type: ignore
-
-        else:
-            error = APIError(
-                error=UnknownError(b"", exception),
-                status=status or HTTPStatus.BAD_REQUEST,
-                **api_error_kwargs,
-            )
-
         if as_result:
-            return Error(error)
-
-        raise error
+            return Error(api_error)
+        raise api_error from None
 
     def _raise_error(
         self,
@@ -129,15 +139,13 @@ class BaseClient(ABCClient, abc.ABC):
         method: HTTPMethod,
         status: HTTPStatus,
         payload: bytes,
-        errors: tuple[typing.Any, ...],
+        errors: tuple[type[typing.Any], ...],
         request_id: str | None = None,
     ) -> typing.NoReturn:
         for error_type in errors:
-            if isinstance(error_type, type) and issubclass(error_type, BaseStatusError):
-                status_error = error_type.get_status_error(status)
-
-                if status_error is not None:
-                    raise status_error
+            if issubclass(error_type, StatusError):
+                if status == error_type.status:
+                    raise error_type.error
 
                 continue
 
@@ -155,7 +163,10 @@ class BaseClient(ABCClient, abc.ABC):
                 if error_obj is not _SENTINEL:
                     raise APIError(error_obj, method, status, path=path, request_id=request_id)
 
-        raise APIError(UnknownError(payload), method, status, path=path, request_id=request_id)
+        if status == HTTPStatus.UNAUTHORIZED:
+            raise APIError(AuthError(status.description), method, status, path=path, request_id=request_id)
+
+        raise APIError(UnknownError(status, payload), method, status, path=path, request_id=request_id)
 
     def _apply_auth(
         self,
