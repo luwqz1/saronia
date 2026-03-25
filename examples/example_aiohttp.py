@@ -1,4 +1,3 @@
-import asyncio
 from uuid import UUID
 
 from aiohttp import ClientSession
@@ -45,7 +44,6 @@ async def main() -> None:
     async with ClientSession(base_url="https://httpbin.org") as session:
         cool_api.build(AiohttpClient(session))
 
-        # Example: get book by id
         result = await books.get_book_by_id(UUID("12345678-1234-5678-1234-567812345678"))
 
         match result:
@@ -55,13 +53,8 @@ async def main() -> None:
                 book = result.unwrap()
                 print(f"Book: {book.name}")
 
-        # Example: create book
         match await books.create_book(id=UUID("87654321-4321-8765-4321-876543218765"), name="New Book"):
             case Error(error):
                 print(f"Error creating book: {error}")
             case _:
                 print("Book created successfully")
-
-
-if __name__ == "__main__":
-    asyncio.run(main())

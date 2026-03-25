@@ -21,7 +21,7 @@ class RnetClient(BaseClient):
         base_url: str = "",
         *,
         user_agent: str | None = None,
-        request_timeout: datetime.timedelta | float = DEFAULT_TIMEOUT,
+        request_timeout: int | float | datetime.timedelta = DEFAULT_TIMEOUT,
         default_headers: bool = False,
     ) -> None:
         super().__init__(
@@ -31,13 +31,7 @@ class RnetClient(BaseClient):
 
         self.client = client
         self.default_headers = default_headers
-        self.request_timeout = (
-            request_timeout
-            if request_timeout is None
-            else datetime.timedelta(seconds=request_timeout)
-            if isinstance(request_timeout, int | float)
-            else request_timeout
-        )
+        self.request_timeout = datetime.timedelta(seconds=request_timeout) if isinstance(request_timeout, int | float) else request_timeout
 
     async def request(
         self,

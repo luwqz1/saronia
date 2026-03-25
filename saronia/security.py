@@ -56,7 +56,7 @@ class HTTPAuthorization(metaclass=AuthCompositeMeta):
 @dataclasses.dataclass(slots=True, repr=False)
 class HTTPBearer(HTTPAuthorization):
     token: dataclasses.InitVar[str]
-    scheme: typing.Literal["Bearer"] = dataclasses.field(default="Bearer", init=False)
+    scheme: str = dataclasses.field(default="Bearer", init=False)
     credentials: str = dataclasses.field(init=False)
 
     def __post_init__(self, token: str) -> None:
@@ -67,7 +67,7 @@ class HTTPBearer(HTTPAuthorization):
 class HTTPBasic(HTTPAuthorization):
     username: dataclasses.InitVar[str]
     password: dataclasses.InitVar[str]
-    scheme: typing.Literal["Basic"] = dataclasses.field(default="Basic", init=False)
+    scheme: str = dataclasses.field(default="Basic", init=False)
     credentials: str = dataclasses.field(init=False)
 
     def __post_init__(self, username: str, password: str) -> None:

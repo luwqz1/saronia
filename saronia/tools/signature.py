@@ -37,7 +37,8 @@ class Signature:
 
     @classmethod
     def from_callable(cls, callable: typing.Callable[..., typing.Any], /) -> typing.Self:
-        signature = callable.__signature__ = inspect.signature(callable, eval_str=True)
+        signature = inspect.signature(callable, eval_str=True)
+        setattr(callable, "__signature__", signature)
 
         var_pos_only: Parameter | None = None
         var_kw_only: Parameter | None = None

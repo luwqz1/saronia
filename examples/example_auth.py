@@ -1,10 +1,12 @@
 """Example demonstrating the saronia authentication system."""
 
+import typing
 from http import HTTPStatus
 
 import msgspex
+from attr import dataclass
 
-from saronia import API, APIResult, HeaderAPIKey, HTTPBearer, QueryAPIKey, StatusError, get, post
+from saronia import API, APIResult, HeaderAPIKey, HTTPBearer, ModelStatusError, QueryAPIKey, get, post
 
 
 # Define auth classes
@@ -20,7 +22,8 @@ class TokenAuth(QueryAPIKey["token"]):
     pass
 
 
-class Authorization(msgspex.Model):
+@dataclass
+class Authorization:
     api_key: ApiKeyAuth | None = None
     token: TokenAuth | None = None
     bearer: BearerAuth | None = None
@@ -32,7 +35,7 @@ class User(msgspex.Model):
     name: str
 
 
-class ErrorResponse(msgspex.Model, StatusError[HTTPStatus.UNAUTHORIZED]):
+class ErrorResponse(msgspex.Model, ModelStatusError[HTTPStatus.UNAUTHORIZED]):
     detail: str
 
 
@@ -71,12 +74,12 @@ class UsersController:
 @api("/admin", auth=ApiKeyAuth & BearerAuth)
 class AdminController:
     @get("/stats")
-    async def get_stats(self) -> APIResult[dict, ErrorResponse]:
+    async def get_stats(self) -> APIResult[dict[str, typing.Any], ErrorResponse]:
         """Requires both ApiKeyAuth AND BearerAuth."""
         ...
 
     @get("/public", auth=None)
-    async def public_stats(self) -> APIResult[dict, ErrorResponse]:
+    async def public_stats(self) -> APIResult[dict[str, typing.Any], ErrorResponse]:
         """Public endpoint."""
         ...
 
@@ -85,12 +88,12 @@ class AdminController:
 @api("/public")
 class PublicController:
     @get("/info")
-    async def get_info(self) -> APIResult[dict, ErrorResponse]:
+    async def get_info(self) -> APIResult[dict[str, typing.Any], ErrorResponse]:
         """Public endpoint (no auth)."""
         ...
 
     @get("/protected", auth=TokenAuth)
-    async def protected_info(self) -> APIResult[dict, ErrorResponse]:
+    async def protected_info(self) -> APIResult[dict[str, typing.Any], ErrorResponse]:
         """Requires TokenAuth."""
         ...
 
@@ -121,9 +124,3 @@ async def main():
         else:
             error = result.unwrap_err()
             print(f"Error: {error}")
-
-
-if __name__ == "__main__":
-    import asyncio
-
-    asyncio.run(main())

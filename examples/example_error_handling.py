@@ -1,4 +1,3 @@
-import asyncio
 from http import HTTPStatus
 from uuid import UUID
 
@@ -6,7 +5,7 @@ from kungfu import Error
 from msgspex import Model
 from rnet import Client
 
-from saronia import API, APIResult, RnetClient, StatusError, get, post
+from saronia import API, APIResult, ModelStatusError, RnetClient, get, post
 from saronia.error import NetworkError
 
 
@@ -16,22 +15,21 @@ class Book(Model):
     author: str
 
 
-# Using StatusError decorator to associate errors with HTTP statuses
-class ValidationError(Model, StatusError[HTTPStatus.BAD_REQUEST, HTTPStatus.UNPROCESSABLE_ENTITY]):
+class ValidationError(Model, ModelStatusError[HTTPStatus.BAD_REQUEST, HTTPStatus.UNPROCESSABLE_ENTITY]):
     message: str
     details: dict[str, list[str]] | None = None
 
 
-class NotFoundError(Model, StatusError[HTTPStatus.NOT_FOUND]):
+class NotFoundError(Model, ModelStatusError[HTTPStatus.NOT_FOUND]):
     message: str
     resource: str
 
 
-class UnauthorizedError(Model, StatusError[HTTPStatus.UNAUTHORIZED]):
+class UnauthorizedError(Model, ModelStatusError[HTTPStatus.UNAUTHORIZED]):
     message: str
 
 
-class ServerError(Model, StatusError[HTTPStatus.INTERNAL_SERVER_ERROR]):
+class ServerError(Model, ModelStatusError[HTTPStatus.INTERNAL_SERVER_ERROR]):
     message: str
     trace_id: str | None = None
 
@@ -70,10 +68,9 @@ async def main() -> None:
             print(f"Method: {api_error.method}")
             print(f"Path: {api_error.path}")
             print(f"Request ID: {api_error.request_id}")
-            print(f"Is Client Error: {api_error.is_client_error}")
-            print(f"Is Server Error: {api_error.is_server_error}")
+            print(f"Is Client Error: {api_error.status.is_client_error}")
+            print(f"Is Server Error: {api_error.status.is_server_error}")
 
-            # Pattern match on specific error types
             match api_error.error:
                 case NotFoundError(message=msg, resource=res):
                     print(f"\nResource not found: {res}")
@@ -84,8 +81,8 @@ async def main() -> None:
                         print(f"Details: {details}")
                 case UnauthorizedError(message=msg):
                     print(f"\nUnauthorized: {msg}")
-                case NetworkError(message=msg, original_error=err):
-                    print("Network error:", msg, ", origin http client error:", repr(err))
+                case NetworkError(network_exception=exc):
+                    print("Network error:", repr(exc))
                 case _:
                     print(f"\nUnexpected error: {api_error.error}")
         case _:
@@ -93,7 +90,6 @@ async def main() -> None:
             print(f"\n=== Success ===")
             print(f"Book: {book.name} by {book.author}")
 
-    # Example 2: Create book with error handling
     print("\n\n=== Creating Book ===")
     create_result = await books.create_book(name="The Great Gatsby", author="F. Scott Fitzgerald")
 
@@ -111,13 +107,9 @@ async def main() -> None:
                 if api_error.error.trace_id:
                     print(f"Trace ID: {api_error.error.trace_id}")
             elif isinstance(api_error.error, NetworkError):
-                print("Network error:", api_error.error.message, ", origin http client error:", repr(api_error.error.original_error))
+                print("Network error:", api_error.error.network_exception)
             else:
-                print("Unknown error:", api_error.error.message.decode(), "http status:", repr(api_error.status))
+                print("Error:", api_error)
         case _:
             book = create_result.unwrap()
             print(f"Book created: {book.name} by {book.author}")
-
-
-if __name__ == "__main__":
-    asyncio.run(main())

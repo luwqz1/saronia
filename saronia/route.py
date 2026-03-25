@@ -15,7 +15,7 @@ import msgspex
 from kungfu import Option, Some
 from kungfu.library.monad.option import NOTHING
 from msgspex.tools.fullname import fullname
-from msgspex.tools.model import get_class_annotations
+from msgspex.tools.model import get_class_annotations  # type: ignore
 
 from saronia.api import join_path
 from saronia.client.abc import MultipartFile
@@ -233,6 +233,8 @@ def _get_form_spec(form_model: type[msgspex.Model], /) -> FormSpec:
                 path_parameters[field_name] = alias_name or field_alias_name
             case File(filename, mime):
                 files[field_alias_name or field_name] = (filename, mime)
+            case _:
+                pass
 
     return _build_form_spec(
         form_model=form_model,

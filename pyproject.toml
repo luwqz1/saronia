@@ -47,11 +47,11 @@ aiohttp = ["aiohttp"]
 [dependency-groups]
 dev = [
     "ruff>=0.15.7,<1",
-    "basedpyright>=1.38.3,<2",
+    "basedpyright>=1.38.4,<2",
     "pre-commit>=4.5.1,<5",
     "pytest>=9.0.2",
     "pytest-asyncio>=1.3.0",
-    "fastapi>=0.135.1",
+    "fastapi>=0.135.2",
     "uvicorn>=0.42.0",
     "httpx>=0.28.1",
     "rnet>=3.0.0rc22",
@@ -138,7 +138,7 @@ exclude = [
   "docs",
   "local",
 ]
-typeCheckingMode = "basic"
+typeCheckingMode = "strict"
 pythonPlatform = "All"
 pythonVersion = "3.14"
 reportMissingImports = true

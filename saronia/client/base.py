@@ -102,7 +102,7 @@ class BaseClient(ABCClient, abc.ABC):
 
         if isinstance(exception, APIError):
             if as_result:
-                return Error(exception)
+                return Error(exception)  # type: ignore
             raise exception from None
 
         error = UncaughtError(uncaught_exception=exception)

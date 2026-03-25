@@ -24,7 +24,7 @@ def join_path(base: str, path: str, /) -> str:
     return (f"{base.rstrip('/')}/{path.lstrip('/')}".rstrip("/")) or "/"
 
 
-class API[**P = [], R = None]:
+class API[**P = []]:
     __slots__ = ("path", "controllers", "_auth_model", "_client")
 
     path: str
