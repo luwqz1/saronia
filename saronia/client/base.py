@@ -12,7 +12,7 @@ from msgspex import decoder
 
 from saronia.__meta__ import __version__
 from saronia.auth import AuthError
-from saronia.client.abc import ABCClient, MultipartFile
+from saronia.client.abc import ABCClient, MultipartFile, ResponseHandler
 from saronia.error import APIError, NetworkError, StatusError, UncaughtError, UnknownError
 
 if typing.TYPE_CHECKING:
@@ -39,6 +39,7 @@ class BaseClient(ABCClient, abc.ABC):
     query_parameters: dict[str, str]
     cookies: dict[str, str]
     auth_model: DataclassInstance | None
+    response_handler: ResponseHandler | None
 
     def __init__(self, user_agent: str, base_url: str = "") -> None:
         self.base_url = base_url
@@ -46,9 +47,13 @@ class BaseClient(ABCClient, abc.ABC):
         self.query_parameters = {}
         self.cookies = {}
         self.auth_model = None
+        self.response_handler = None
 
     def auth(self, auth_model: DataclassInstance) -> None:
         self.auth_model = auth_model
+
+    def add_response_handler(self, handler: ResponseHandler, /) -> None:
+        self.response_handler = handler
 
     @abc.abstractmethod
     async def request(
@@ -65,6 +70,7 @@ class BaseClient(ABCClient, abc.ABC):
         query_params: Option[typing.Mapping[str, typing.Any]],
         body: Option[typing.Any],
         files: Option[typing.Mapping[str, MultipartFile]],
+        response_handler: Option[ResponseHandler],
         auth: typing.Any = None,
     ) -> typing.Any:
         pass
@@ -72,7 +78,9 @@ class BaseClient(ABCClient, abc.ABC):
     def _validate_response(
         self,
         payload: bytes | None,
+        status: HTTPStatus,
         response_type: typing.Any,
+        response_handler: ResponseHandler | None = None,
         as_result: bool = False,
     ) -> typing.Any:
         if not payload:
@@ -81,8 +89,13 @@ class BaseClient(ABCClient, abc.ABC):
 
             response = None
         else:
-            response = decoder.decode(payload, type=response_type)
+            try:
+                response = decoder.decode(payload, type=response_type)
+            except msgspec.DecodeError:
+                raise UnknownError(status, payload) from None
 
+        if response_handler is not None:
+            response = response_handler(response)
         return Ok(response) if as_result else response
 
     def _handle_error(

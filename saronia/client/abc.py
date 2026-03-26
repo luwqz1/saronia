@@ -8,6 +8,8 @@ if typing.TYPE_CHECKING:
     from io import IOBase
     from pathlib import Path
 
+type ResponseHandler = typing.Callable[[typing.Any], typing.Any]
+
 
 class MultipartFile(typing.NamedTuple):
     name: str
@@ -42,6 +44,7 @@ class ABCClient(abc.ABC):
         query_params: Option[typing.Mapping[str, typing.Any]],
         body: Option[typing.Any],
         files: Option[typing.Mapping[str, MultipartFile]],
+        response_handler: Option[ResponseHandler],
         auth: typing.Any = None,
     ) -> typing.Any:
         pass

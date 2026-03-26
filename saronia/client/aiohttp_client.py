@@ -7,7 +7,7 @@ from kungfu import Option
 from kungfu.library.monad.option import NOTHING
 from msgspex import encoder
 
-from saronia.client.base import DEFAULT_TIMEOUT, DEFAULT_USER_AGENT, BaseClient, MultipartFile
+from saronia.client.base import DEFAULT_TIMEOUT, DEFAULT_USER_AGENT, BaseClient, MultipartFile, ResponseHandler
 
 if typing.TYPE_CHECKING:
     import aiohttp
@@ -44,6 +44,7 @@ class AiohttpClient(BaseClient):
         query_params: Option[typing.Mapping[str, typing.Any]],
         body: Option[typing.Any],
         files: Option[typing.Mapping[str, MultipartFile]],
+        response_handler: Option[ResponseHandler],
         auth: typing.Any = None,
     ) -> typing.Any:
         import aiohttp
@@ -91,19 +92,26 @@ class AiohttpClient(BaseClient):
 
                 kwargs["data"] = form_data
 
-            async with self.session.request(method.value, path, **kwargs) as resp:
-                content = await resp.read()
+            async with self.session.request(method.value, path, **kwargs) as response:
+                status = HTTPStatus(response.status)
+                payload = await response.read()
 
-                if 200 <= resp.status < 300:
-                    return self._validate_response(content, response_type.unwrap_or(typing.Any), as_result=True)
+                if status.is_success:
+                    return self._validate_response(
+                        payload,
+                        status,
+                        response_type=response_type.unwrap_or(typing.Any),
+                        response_handler=response_handler.unwrap_or(self.response_handler),
+                        as_result=as_result,
+                    )
 
                 self._raise_error(
                     path,
                     method,
-                    status=(status := HTTPStatus(resp.status)),
-                    payload=content,
+                    status=status,
+                    payload=payload,
                     errors=errors,
-                    request_id=(request_id := resp.headers.get("X-Request-ID") or resp.headers.get("Request-ID")),
+                    request_id=(request_id := response.headers.get("X-Request-ID") or response.headers.get("Request-ID")),
                 )
         except BaseException as exception:
             return self._handle_error(

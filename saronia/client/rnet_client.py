@@ -8,7 +8,7 @@ from io import IOBase
 from kungfu import Option
 from msgspex import encoder
 
-from saronia.client.base import DEFAULT_TIMEOUT, DEFAULT_USER_AGENT, BaseClient, MultipartFile
+from saronia.client.base import DEFAULT_TIMEOUT, DEFAULT_USER_AGENT, BaseClient, MultipartFile, ResponseHandler
 
 if typing.TYPE_CHECKING:
     import rnet
@@ -47,6 +47,7 @@ class RnetClient(BaseClient):
         query_params: Option[typing.Mapping[str, typing.Any]],
         body: Option[typing.Any],
         files: Option[typing.Mapping[str, MultipartFile]],
+        response_handler: Option[ResponseHandler],
         auth: typing.Any = None,
     ) -> typing.Any:
         import rnet
@@ -99,25 +100,34 @@ class RnetClient(BaseClient):
 
                 kwargs["multipart"] = rnet.Multipart(*parts)
 
-            resp = await self.client.request(
+            response = await self.client.request(
                 getattr(rnet.Method, method.name),
                 url,
                 default_headers=self.default_headers,
                 timeout=self.request_timeout,
                 **kwargs,
             )
-            payload = await resp.bytes()
+            status = HTTPStatus(response.status.as_int())
+            payload = await response.bytes()
 
-            if 200 <= resp.status.as_int() < 300:
-                return self._validate_response(payload, response_type.unwrap_or(typing.Any), as_result=as_result)
+            if status.is_success:
+                return self._validate_response(
+                    payload,
+                    status,
+                    response_type=response_type.unwrap_or(typing.Any),
+                    response_handler=response_handler.unwrap_or(self.response_handler),
+                    as_result=as_result,
+                )
 
             self._raise_error(
                 path,
                 method,
-                status=(status := HTTPStatus(resp.status.as_int())),
+                status=status,
                 payload=payload,
                 errors=errors,
-                request_id=(request_id := None if not (req_id := resp.headers.get("x-request-id") or resp.headers.get("request-id")) else req_id.decode()),
+                request_id=(
+                    request_id := None if not (req_id := response.headers.get("x-request-id") or response.headers.get("request-id")) else req_id.decode()
+                ),
             )
         except BaseException as exception:
             return self._handle_error(

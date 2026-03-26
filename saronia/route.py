@@ -18,7 +18,7 @@ from msgspex.tools.fullname import fullname
 from msgspex.tools.model import get_class_annotations  # type: ignore
 
 from saronia.api import join_path
-from saronia.client.abc import MultipartFile
+from saronia.client.abc import MultipartFile, ResponseHandler
 from saronia.controller import Controller
 from saronia.tools.model_from_signature import create_model_from_function_signature
 from saronia.tools.parameters import (
@@ -67,6 +67,7 @@ type APIResult[Value, Err = typing.Never] = kungfu.Result[Value, Err]
 _ROUTE_DEPRECATED_ATTR: typing.Final = "__saronia_route_deprecated__"
 _PATH_PARAM_RE: typing.Final = re.compile(r"{([a-zA-Z_][a-zA-Z0-9_]*)}")
 _NORESPONSE: typing.Final = object()
+_NORESPONSE_HANDLER: typing.Final = typing.cast("typing.Any", object())
 _NOAUTH: typing.Final = object()
 
 
@@ -397,12 +398,12 @@ def route_deprecated(
 def route(
     method: HTTPMethod,
     __path: str,
-    _form: type[msgspex.Model] | None = None,
     /,
     *errors: typing.Any,
     form: type[msgspex.Model] | None = None,
     auth: typing.Any = _NOAUTH,
     response: typing.Any = _NORESPONSE,
+    response_handler: ResponseHandler = _NORESPONSE_HANDLER,
     path: bool = True,
     query: bool = False,
     header: bool = False,
@@ -410,6 +411,7 @@ def route(
     json: bool = False,
 ) -> typing.Callable[[typing.Callable[..., typing.Any]], typing.Callable[..., typing.Any]]:
     form_spec: FormSpec | None = None
+    resp_handler = Some(response_handler) if response_handler is not _NORESPONSE_HANDLER else NOTHING
     _errors: tuple[typing.Any, ...] = errors
     as_result = False
 
@@ -427,10 +429,7 @@ def route(
 
         nonlocal form_spec, _errors, response, as_result
 
-        if sig.has_return_type and (typing.get_origin(sig.return_type) or sig.return_type in (APIResult, kungfu.Result)):
-            if form is None and _form is not None:
-                form_spec = _create_form_spec(__path, _form)
-
+        if response is _NORESPONSE and sig.has_return_type and (typing.get_origin(sig.return_type) or sig.return_type in (APIResult, kungfu.Result)):
             if len(typing.get_args(sig.return_type)) == 2:
                 as_result = True
                 resp, error = typing.get_args(sig.return_type)
@@ -442,15 +441,8 @@ def route(
                 resp = response
 
             response = resp if response is _NORESPONSE else response
-        else:
-            if sig.has_return_type:
-                response = sig.return_type
-
-            if _form is not None and form is not None:
-                _errors = (_form,) + _errors
-
-            elif form is None and _form is not None:
-                form_spec = _create_form_spec(__path, _form)
+        elif response is _NORESPONSE and sig.has_return_type:
+            response = sig.return_type
 
         if form_spec is None:
             form_spec = _create_form_spec(
@@ -489,6 +481,7 @@ def route(
                 query_params=parsed.query_params,
                 body=parsed.body,
                 files=parsed.files,
+                response_handler=resp_handler,
             )
 
         del sig

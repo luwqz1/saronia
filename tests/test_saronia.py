@@ -196,7 +196,7 @@ class ItemResponse(Model):
 class ListResponse(Model):
     limit: int
     offset: int
-    items: list
+    items: list[typing.Any]
     search: str | None = None
 
 
@@ -252,7 +252,7 @@ class ErrorMessage(Model):
 
 class ErrorDetail(Model):
     message: str
-    details: dict
+    details: dict[str, typing.Any]
 
 
 class OkResponse(Model):

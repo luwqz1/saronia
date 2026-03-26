@@ -47,7 +47,7 @@ class BooksController:
     @get("/{book_id}")
     async def get_book_by_id(self, book_id: UUID) -> APIResult[Book, ValidationError | NotFoundError | UnauthorizedError]: ...
 
-    @post("/create", CreateBookDTO)
+    @post("/create", form=CreateBookDTO)
     async def create_book(self) -> APIResult[Book, ValidationError | ServerError]: ...
 
 
