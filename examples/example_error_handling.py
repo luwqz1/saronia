@@ -3,9 +3,9 @@ from uuid import UUID
 
 from kungfu import Error
 from msgspex import Model
-from rnet import Client
+from wreq import Client
 
-from saronia import API, APIResult, ModelStatusError, RnetClient, get, post
+from saronia import API, APIResult, ModelStatusError, WreqClient, get, post
 from saronia.error import NetworkError
 
 
@@ -56,7 +56,7 @@ books = BooksController()
 
 async def main() -> None:
     client = Client()
-    cool_api.build(RnetClient(client, base_url="https://httpbin.org"))
+    cool_api.build(WreqClient(client, base_url="https://httpbin.org"))
 
     # Example 1: Handle specific error types
     result = await books.get_book_by_id(UUID("12345678-1234-5678-1234-567812345678"))

@@ -22,7 +22,7 @@
 
 - Declarative API controller syntax
 - Type-safe request/response handling
-- Support for multiple HTTP clients (`rnet`, `aiohttp`, or custom)
+- Support for multiple HTTP clients (`wreq`, `aiohttp`, or custom)
 - Comprehensive error handling
 - Support for path parameters, query parameters, headers, body, JSON, form data, and file uploads
 - Built on top of `msgspex` for fast serialization and `kungfu` for functional types (optional)
@@ -33,8 +33,8 @@
 # Base installation
 pip install saronia
 
-# With rnet client
-pip install saronia[rnet]
+# With wreq client
+pip install saronia[wreq]
 
 # With aiohttp client
 pip install saronia[aiohttp]
@@ -50,8 +50,8 @@ from kungfu import Error, Ok
 from msgspex import Model
 from saronia import API, APIError, APIResult, HTTPBearer, ModelStatusError, get, post
 
-from rnet import Client
-from saronia import RnetClient
+from wreq import Client
+from saronia import WreqClient
 
 Token = HTTPBearer
 
@@ -99,7 +99,7 @@ books = BooksController()
 async def main() -> None:
     client = Client()
 
-    cool_api.build(RnetClient(client, base_url="https://api.example.com", request_timeout=45.0))
+    cool_api.build(WreqClient(client, base_url="https://api.example.com", request_timeout=45.0))
     cool_api.auth(token=Token("abc123..."))
 
     try:

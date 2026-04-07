@@ -2,7 +2,7 @@ from uuid import UUID
 
 from kungfu import Error
 from msgspex import Model
-from rnet import Client
+from wreq import Client
 
 from saronia import API, APIResult, RnetClient, get, post
 
