@@ -7,6 +7,7 @@ from kungfu import Option
 from kungfu.library.monad.option import NOTHING
 from msgspex import encoder
 
+from saronia.client.abc import ContentType
 from saronia.client.base import DEFAULT_TIMEOUT, DEFAULT_USER_AGENT, BaseClient, MultipartFile, ResponseHandler
 
 if typing.TYPE_CHECKING:
@@ -37,6 +38,7 @@ class AiohttpClient(BaseClient):
         *,
         as_result: bool,
         errors: tuple[typing.Any, ...],
+        content_type: ContentType,
         response_type: Option[typing.Any],
         json: Option[str | bytes],
         headers: Option[typing.Mapping[str, typing.Any]],
@@ -98,8 +100,9 @@ class AiohttpClient(BaseClient):
 
                 if status.is_success:
                     return self._validate_response(
-                        payload,
+                        payload if content_type != "text" else await response.text(),
                         status,
+                        content_type=content_type,
                         response_type=response_type.unwrap_or(typing.Any),
                         response_handler=response_handler.unwrap_or(self.response_handler),
                         as_result=as_result,

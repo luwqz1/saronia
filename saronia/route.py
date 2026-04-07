@@ -11,6 +11,7 @@ from functools import partial, wraps
 from http import HTTPMethod
 
 import kungfu
+import msgspec
 import msgspex
 from kungfu import Option, Some
 from kungfu.library.monad.option import NOTHING
@@ -18,7 +19,7 @@ from msgspex.tools.fullname import fullname
 from msgspex.tools.model import get_class_annotations  # type: ignore
 
 from saronia.api import join_path
-from saronia.client.abc import MultipartFile, ResponseHandler
+from saronia.client.abc import ContentType, MultipartFile, ResponseHandler
 from saronia.controller import Controller
 from saronia.tools.model_from_signature import create_model_from_function_signature
 from saronia.tools.parameters import (
@@ -403,6 +404,7 @@ def route(
     form: type[msgspex.Model] | None = None,
     auth: typing.Any = _NOAUTH,
     response: typing.Any = _NORESPONSE,
+    content_type: ContentType = "any",
     response_handler: ResponseHandler = _NORESPONSE_HANDLER,
     path: bool = True,
     query: bool = False,
@@ -444,6 +446,28 @@ def route(
         elif response is _NORESPONSE and sig.has_return_type:
             response = sig.return_type
 
+        if response is not _NORESPONSE and content_type != "any":
+            resp = typing.get_origin(response) or response
+            err = None
+
+            match content_type:
+                case "content" if resp is not bytes:
+                    err = TypeError("Response type must be `bytes` when content type is `content`.")
+                case "text" if resp is not str:
+                    err = TypeError("Response type must be `str` when content type is `text`.")
+                case "json" if not (
+                    resp is None or dataclasses.is_dataclass(resp) or issubclass(type(resp), msgspec.StructMeta) or resp in (dict, list, tuple, set, frozenset)
+                ):
+                    err = TypeError(
+                        "Response type must be one of `dataclasses.dataclass`, `msgspec.Struct`, `dict`, "
+                        "`list`, `tuple`, `set`, `frozenset` when content type is `json`.",
+                    )
+                case _:
+                    pass
+
+            if err is not None:
+                raise err
+
         if form_spec is None:
             form_spec = _create_form_spec(
                 path=__path,
@@ -474,6 +498,7 @@ def route(
                 as_result=as_result,
                 auth=_resolve_auth(getattr(type(controller), SARONIA_CONTROLLER_AUTH_ATTR, None), auth),
                 errors=_errors,
+                content_type=content_type,
                 response_type=NOTHING if response is _NORESPONSE else Some(response),
                 json=parsed.json,
                 headers=parsed.header_params,

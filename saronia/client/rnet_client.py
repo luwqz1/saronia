@@ -8,16 +8,17 @@ from io import IOBase
 from kungfu import Option
 from msgspex import encoder
 
+from saronia.client.abc import ContentType
 from saronia.client.base import DEFAULT_TIMEOUT, DEFAULT_USER_AGENT, BaseClient, MultipartFile, ResponseHandler
 
 if typing.TYPE_CHECKING:
-    import rnet
+    import wreq
 
 
 class RnetClient(BaseClient):
     def __init__(
         self,
-        client: "rnet.Client",
+        client: "wreq.Client",
         base_url: str = "",
         *,
         user_agent: str | None = None,
@@ -25,7 +26,7 @@ class RnetClient(BaseClient):
         default_headers: bool = False,
     ) -> None:
         super().__init__(
-            user_agent=user_agent or DEFAULT_USER_AGENT.format(http_client="rnet3"),
+            user_agent=user_agent or DEFAULT_USER_AGENT.format(http_client="wreq"),
             base_url=base_url.rstrip("/"),
         )
 
@@ -40,6 +41,7 @@ class RnetClient(BaseClient):
         *,
         as_result: bool = False,
         errors: tuple[typing.Any, ...],
+        content_type: ContentType,
         response_type: Option[typing.Any],
         json: Option[str | bytes],
         headers: Option[typing.Mapping[str, typing.Any]],
@@ -50,8 +52,8 @@ class RnetClient(BaseClient):
         response_handler: Option[ResponseHandler],
         auth: typing.Any = None,
     ) -> typing.Any:
-        import rnet
-        import rnet.exceptions
+        import wreq
+        import wreq.exceptions
 
         url = f"{self.base_url}{path}" if self.base_url else path
         status = request_id = None
@@ -82,15 +84,15 @@ class RnetClient(BaseClient):
                     k: v if isinstance(v, str | int | bool | float) else encoder.encode(v).strip('"') for k, v in urlencoded_params.unwrap().items()
                 }
             elif files:
-                parts: list[rnet.Part] = []
+                parts: list[wreq.Part] = []
 
                 for k, v in urlencoded_params.unwrap().items():
-                    parts.append(rnet.Part(k, v if isinstance(v, str) else encoder.encode(v).strip('"')))
+                    parts.append(wreq.Part(k, v if isinstance(v, str) else encoder.encode(v).strip('"')))
 
                 for field_name, file_info in files.unwrap().items():
                     content = file_info.content.read() if isinstance(file_info.content, typing.IO | IOBase) else file_info.content
                     parts.append(
-                        rnet.Part(
+                        wreq.Part(
                             name=field_name,
                             value=content,
                             filename=file_info.name,
@@ -98,22 +100,23 @@ class RnetClient(BaseClient):
                         ),
                     )
 
-                kwargs["multipart"] = rnet.Multipart(*parts)
+                kwargs["multipart"] = wreq.Multipart(*parts)
 
             response = await self.client.request(
-                getattr(rnet.Method, method.name),
+                getattr(wreq.Method, method.name),
                 url,
                 default_headers=self.default_headers,
                 timeout=self.request_timeout,
                 **kwargs,
             )
+            request_id = None if not (req_id := response.headers.get("x-request-id") or response.headers.get("request-id")) else req_id.decode()
             status = HTTPStatus(response.status.as_int())
-            payload = await response.bytes()
 
             if status.is_success:
                 return self._validate_response(
-                    payload,
+                    await response.bytes() if content_type != "text" else await response.text(),
                     status,
+                    content_type=content_type,
                     response_type=response_type.unwrap_or(typing.Any),
                     response_handler=response_handler.unwrap_or(self.response_handler),
                     as_result=as_result,
@@ -123,11 +126,9 @@ class RnetClient(BaseClient):
                 path,
                 method,
                 status=status,
-                payload=payload,
+                payload=await response.bytes(),
                 errors=errors,
-                request_id=(
-                    request_id := None if not (req_id := response.headers.get("x-request-id") or response.headers.get("request-id")) else req_id.decode()
-                ),
+                request_id=request_id,
             )
         except BaseException as exception:
             return self._handle_error(
@@ -136,15 +137,15 @@ class RnetClient(BaseClient):
                 path,
                 request_id,
                 exception,
-                rnet.exceptions.ConnectionError,
-                rnet.exceptions.ConnectionResetError,
-                rnet.exceptions.ProxyConnectionError,
-                rnet.exceptions.RequestError,
-                rnet.exceptions.TimeoutError,
-                rnet.exceptions.RustPanic,
-                rnet.exceptions.TlsError,
-                rnet.exceptions.BodyError,
-                rnet.exceptions.RedirectError,
+                wreq.exceptions.ConnectionError,
+                wreq.exceptions.ConnectionResetError,
+                wreq.exceptions.ProxyConnectionError,
+                wreq.exceptions.RequestError,
+                wreq.exceptions.TimeoutError,
+                wreq.exceptions.RustPanic,
+                wreq.exceptions.TlsError,
+                wreq.exceptions.BodyError,
+                wreq.exceptions.RedirectError,
                 as_result=as_result,
             )
 

@@ -4,9 +4,9 @@ import typing
 from http import HTTPMethod, HTTPStatus
 from reprlib import recursive_repr
 
-if typing.TYPE_CHECKING:
-    from msgspec import ValidationError
+from msgspec import ValidationError
 
+if typing.TYPE_CHECKING:
     from saronia.auth import AuthError
 
     type BaseError = AuthError | ValidationError | NetworkError | UnknownError | UncaughtError
@@ -138,4 +138,12 @@ class APIError[Error = typing.Never](Exception):
         return f"<{' '.join(parts)}>"
 
 
-__all__ = ("APIError", "ModelStatusError", "NetworkError", "StatusError", "UncaughtError", "UnknownError")
+__all__ = (
+    "APIError",
+    "ModelStatusError",
+    "NetworkError",
+    "StatusError",
+    "UncaughtError",
+    "UnknownError",
+    "ValidationError",
+)

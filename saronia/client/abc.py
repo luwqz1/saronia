@@ -9,6 +9,7 @@ if typing.TYPE_CHECKING:
     from pathlib import Path
 
 type ResponseHandler = typing.Callable[[typing.Any], typing.Any]
+type ContentType = typing.Literal["any", "content", "text", "json"]
 
 
 class MultipartFile(typing.NamedTuple):
@@ -37,6 +38,7 @@ class ABCClient(abc.ABC):
         *,
         as_result: bool,
         errors: tuple[typing.Any, ...],
+        content_type: ContentType,
         response_type: Option[typing.Any],
         json: Option[str | bytes],
         headers: Option[typing.Mapping[str, typing.Any]],

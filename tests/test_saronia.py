@@ -1,5 +1,5 @@
 """Comprehensive tests for saronia using a real FastAPI server.
-Tests both AiohttpClient and RnetClient across all parameter types and error scenarios."""
+Tests both AiohttpClient and WreqClient across all parameter types and error scenarios."""
 
 import base64
 import io
@@ -17,7 +17,7 @@ from fastapi.responses import JSONResponse, Response
 from msgspex import Model
 
 import saronia
-from saronia import API, AiohttpClient, APIResult, RnetClient, delete, get, patch, post, put
+from saronia import API, AiohttpClient, APIResult, WreqClient, delete, get, patch, post, put
 from saronia.error import StatusError, UnknownError
 from saronia.security import (
     CookieAPIKey,
@@ -54,6 +54,13 @@ async def server_get_item(
     tag: str | None = Query(None),
 ):
     return {"item_id": item_id, "q": q, "tag": tag}
+
+
+@app.get("/items/{item_id}/text")
+async def server_get_item(
+    item_id: int = Path(...),
+):
+    return Response(str(item_id))
 
 
 @app.get("/items")
@@ -412,11 +419,11 @@ class AiohttpMiscController:
     async def get_with_request_id(self) -> APIResult[OkResponse, ErrorMessage]: ...
 
 
-rnet_api = API.endpoint("")
+wreq_api = API.endpoint("")
 
 
-@rnet_api("/items")
-class RnetItemsController:
+@wreq_api("/items")
+class WreqItemsController:
     @get("/{item_id}")
     async def get_item(
         self,
@@ -430,6 +437,9 @@ class RnetItemsController:
         q: SQuery[str],
         tag: SQuery[str],
     ) -> APIResult[ItemResponse, ErrorMessage]: ...
+
+    @get("/{item_id}/text", content_type="text")
+    async def get_item_text(self, item_id: SPath[int]) -> APIResult[str, ErrorMessage]: ...
 
     @get("")
     async def list_items(
@@ -476,11 +486,11 @@ class RnetItemsController:
     ) -> APIResult[DeleteResponse, ErrorMessage]: ...
 
 
-rnet_headers_api = API.endpoint("")
+wreq_headers_api = API.endpoint("")
 
 
-@rnet_headers_api("/headers-echo")
-class RnetHeadersController:
+@wreq_headers_api("/headers-echo")
+class WreqHeadersController:
     @get("")
     async def echo_headers(
         self,
@@ -489,11 +499,11 @@ class RnetHeadersController:
     ) -> APIResult[HeadersResponse, ErrorMessage]: ...
 
 
-rnet_xheaders_api = API.endpoint("")
+wreq_xheaders_api = API.endpoint("")
 
 
-@rnet_xheaders_api("/x-headers-echo")
-class RnetXHeadersController:
+@wreq_xheaders_api("/x-headers-echo")
+class WreqXHeadersController:
     @get("")
     async def echo_x_headers(
         self,
@@ -502,11 +512,11 @@ class RnetXHeadersController:
     ) -> APIResult[XHeadersResponse, ErrorMessage]: ...
 
 
-rnet_form_api = API.endpoint("")
+wreq_form_api = API.endpoint("")
 
 
-@rnet_form_api("/form")
-class RnetFormController:
+@wreq_form_api("/form")
+class WreqFormController:
     @post("")
     async def submit_form(
         self,
@@ -515,11 +525,11 @@ class RnetFormController:
     ) -> APIResult[FormResponse, ErrorMessage]: ...
 
 
-rnet_upload_api = API.endpoint("")
+wreq_upload_api = API.endpoint("")
 
 
-@rnet_upload_api("/upload")
-class RnetUploadController:
+@wreq_upload_api("/upload")
+class WreqUploadController:
     @post("")
     async def upload(
         self,
@@ -528,11 +538,11 @@ class RnetUploadController:
     ) -> APIResult[UploadResponse, ErrorMessage]: ...
 
 
-rnet_errors_api = API.endpoint("/errors")  # base prefix is prepended to controller path on build()
+wreq_errors_api = API.endpoint("/errors")  # base prefix is prepended to controller path on build()
 
 
-@rnet_errors_api("")
-class RnetErrorsController:
+@wreq_errors_api("")
+class WreqErrorsController:
     @get("/400")
     async def get_400(self) -> APIResult[None, ErrorMessage]: ...
 
@@ -552,11 +562,11 @@ class RnetErrorsController:
     async def get_empty(self) -> APIResult[None, ErrorMessage]: ...
 
 
-rnet_misc_api = API.endpoint("")
+wreq_misc_api = API.endpoint("")
 
 
-@rnet_misc_api("/request-id")
-class RnetMiscController:
+@wreq_misc_api("/request-id")
+class WreqMiscController:
     @get("")
     async def get_with_request_id(self) -> APIResult[OkResponse, ErrorMessage]: ...
 
@@ -625,59 +635,59 @@ async def aiohttp_misc():
 
 
 @pytest_asyncio.fixture
-async def rnet_items():
-    import rnet
+async def wreq_items():
+    import wreq
 
-    rnet_api.build(RnetClient(rnet.Client(), base_url=BASE_URL))
-    yield RnetItemsController()
-
-
-@pytest_asyncio.fixture
-async def rnet_headers():
-    import rnet
-
-    rnet_headers_api.build(RnetClient(rnet.Client(), base_url=BASE_URL))
-    yield RnetHeadersController()
+    wreq_api.build(WreqClient(wreq.Client(), base_url=BASE_URL))
+    yield WreqItemsController()
 
 
 @pytest_asyncio.fixture
-async def rnet_xheaders():
-    import rnet
+async def wreq_headers():
+    import wreq
 
-    rnet_xheaders_api.build(RnetClient(rnet.Client(), base_url=BASE_URL))
-    yield RnetXHeadersController()
-
-
-@pytest_asyncio.fixture
-async def rnet_form():
-    import rnet
-
-    rnet_form_api.build(RnetClient(rnet.Client(), base_url=BASE_URL))
-    yield RnetFormController()
+    wreq_headers_api.build(WreqClient(wreq.Client(), base_url=BASE_URL))
+    yield WreqHeadersController()
 
 
 @pytest_asyncio.fixture
-async def rnet_upload():
-    import rnet
+async def wreq_xheaders():
+    import wreq
 
-    rnet_upload_api.build(RnetClient(rnet.Client(), base_url=BASE_URL))
-    yield RnetUploadController()
-
-
-@pytest_asyncio.fixture
-async def rnet_errors():
-    import rnet
-
-    rnet_errors_api.build(RnetClient(rnet.Client(), base_url=BASE_URL))
-    yield RnetErrorsController()
+    wreq_xheaders_api.build(WreqClient(wreq.Client(), base_url=BASE_URL))
+    yield WreqXHeadersController()
 
 
 @pytest_asyncio.fixture
-async def rnet_misc():
-    import rnet
+async def wreq_form():
+    import wreq
 
-    rnet_misc_api.build(RnetClient(rnet.Client(), base_url=BASE_URL))
-    yield RnetMiscController()
+    wreq_form_api.build(WreqClient(wreq.Client(), base_url=BASE_URL))
+    yield WreqFormController()
+
+
+@pytest_asyncio.fixture
+async def wreq_upload():
+    import wreq
+
+    wreq_upload_api.build(WreqClient(wreq.Client(), base_url=BASE_URL))
+    yield WreqUploadController()
+
+
+@pytest_asyncio.fixture
+async def wreq_errors():
+    import wreq
+
+    wreq_errors_api.build(WreqClient(wreq.Client(), base_url=BASE_URL))
+    yield WreqErrorsController()
+
+
+@pytest_asyncio.fixture
+async def wreq_misc():
+    import wreq
+
+    wreq_misc_api.build(WreqClient(wreq.Client(), base_url=BASE_URL))
+    yield WreqMiscController()
 
 
 def assert_ok(result: typing.Any) -> typing.Any:
@@ -925,178 +935,183 @@ class TestAiohttpMisc:
         assert data.ok is True
 
 
-class TestRnetGetItemNoQuery:
+class TestWreqGetItemNoQuery:
     @pytest.mark.asyncio
-    async def test_returns_item(self, rnet_items):
-        item = assert_ok(await rnet_items.get_item(item_id=42))
+    async def test_returns_item(self, wreq_items):
+        item = assert_ok(await wreq_items.get_item(item_id=42))
         assert item.item_id == 42
 
     @pytest.mark.asyncio
-    async def test_different_ids(self, rnet_items):
+    async def test_returns_item_as_text(self, wreq_items):
+        item = assert_ok(await wreq_items.get_item_text(item_id=42))
+        assert isinstance(item, str)
+
+    @pytest.mark.asyncio
+    async def test_different_ids(self, wreq_items):
         for item_id in (1, 100, 999):
-            item = assert_ok(await rnet_items.get_item(item_id=item_id))
+            item = assert_ok(await wreq_items.get_item(item_id=item_id))
             assert item.item_id == item_id
 
 
-class TestRnetGetItemWithQuery:
+class TestWreqGetItemWithQuery:
     @pytest.mark.asyncio
-    async def test_both_query_params_sent(self, rnet_items):
-        item = assert_ok(await rnet_items.get_item_with_query(item_id=7, q="hello", tag="python"))
+    async def test_both_query_params_sent(self, wreq_items):
+        item = assert_ok(await wreq_items.get_item_with_query(item_id=7, q="hello", tag="python"))
         assert item.item_id == 7
         assert item.q == "hello"
         assert item.tag == "python"
 
     @pytest.mark.asyncio
-    async def test_query_params_different_values(self, rnet_items):
-        item = assert_ok(await rnet_items.get_item_with_query(item_id=1, q="search", tag="test"))
+    async def test_query_params_different_values(self, wreq_items):
+        item = assert_ok(await wreq_items.get_item_with_query(item_id=1, q="search", tag="test"))
         assert item.q == "search"
         assert item.tag == "test"
 
 
-class TestRnetListItems:
+class TestWreqListItems:
     @pytest.mark.asyncio
-    async def test_default_pagination(self, rnet_items):
-        data = assert_ok(await rnet_items.list_items())
+    async def test_default_pagination(self, wreq_items):
+        data = assert_ok(await wreq_items.list_items())
         assert data.limit == 10
         assert data.offset == 0
 
     @pytest.mark.asyncio
-    async def test_custom_pagination(self, rnet_items):
-        data = assert_ok(await rnet_items.list_items(limit=25, offset=50))
+    async def test_custom_pagination(self, wreq_items):
+        data = assert_ok(await wreq_items.list_items(limit=25, offset=50))
         assert data.limit == 25
         assert data.offset == 50
 
     @pytest.mark.asyncio
-    async def test_with_search_param(self, rnet_items):
-        data = assert_ok(await rnet_items.list_items_with_search(limit=10, offset=0, search="gadget"))
+    async def test_with_search_param(self, wreq_items):
+        data = assert_ok(await wreq_items.list_items_with_search(limit=10, offset=0, search="gadget"))
         assert data.search == "gadget"
 
 
-class TestRnetPostJson:
+class TestWreqPostJson:
     @pytest.mark.asyncio
-    async def test_create_in_stock(self, rnet_items):
-        item = assert_ok(await rnet_items.create_item(name="Gadget", price=49.95, in_stock=True))
+    async def test_create_in_stock(self, wreq_items):
+        item = assert_ok(await wreq_items.create_item(name="Gadget", price=49.95, in_stock=True))
         assert item.name == "Gadget"
         assert item.price == 49.95
         assert item.in_stock is True
 
     @pytest.mark.asyncio
-    async def test_create_out_of_stock(self, rnet_items):
-        item = assert_ok(await rnet_items.create_item(name="Rare", price=999.0, in_stock=False))
+    async def test_create_out_of_stock(self, wreq_items):
+        item = assert_ok(await wreq_items.create_item(name="Rare", price=999.0, in_stock=False))
         assert item.in_stock is False
 
     @pytest.mark.asyncio
-    async def test_create_preserves_name(self, rnet_items):
-        item = assert_ok(await rnet_items.create_item(name="Special", price=1.0, in_stock=True))
+    async def test_create_preserves_name(self, wreq_items):
+        item = assert_ok(await wreq_items.create_item(name="Special", price=1.0, in_stock=True))
         assert item.name == "Special"
 
 
-class TestRnetPut:
+class TestWreqPut:
     @pytest.mark.asyncio
-    async def test_update_item(self, rnet_items):
-        data = assert_ok(await rnet_items.update_item(item_id=10, name="New Name", price=5.0))
+    async def test_update_item(self, wreq_items):
+        data = assert_ok(await wreq_items.update_item(item_id=10, name="New Name", price=5.0))
         assert data.item_id == 10
         assert data.name == "New Name"
 
     @pytest.mark.asyncio
-    async def test_update_preserves_item_id(self, rnet_items):
-        data = assert_ok(await rnet_items.update_item(item_id=77, name="X", price=1.0))
+    async def test_update_preserves_item_id(self, wreq_items):
+        data = assert_ok(await wreq_items.update_item(item_id=77, name="X", price=1.0))
         assert data.item_id == 77
 
 
-class TestRnetPatch:
+class TestWreqPatch:
     @pytest.mark.asyncio
-    async def test_patch_sets_flag(self, rnet_items):
-        data = assert_ok(await rnet_items.patch_item(item_id=2, name="Partial"))
+    async def test_patch_sets_flag(self, wreq_items):
+        data = assert_ok(await wreq_items.patch_item(item_id=2, name="Partial"))
         assert data.item_id == 2
         assert data.patched is True
         assert data.name == "Partial"
 
 
-class TestRnetDelete:
+class TestWreqDelete:
     @pytest.mark.asyncio
-    async def test_delete_returns_deleted(self, rnet_items):
-        data = assert_ok(await rnet_items.delete_item(item_id=77))
+    async def test_delete_returns_deleted(self, wreq_items):
+        data = assert_ok(await wreq_items.delete_item(item_id=77))
         assert data.deleted is True
         assert data.item_id == 77
 
     @pytest.mark.asyncio
-    async def test_delete_different_ids(self, rnet_items):
+    async def test_delete_different_ids(self, wreq_items):
         for item_id in (1, 42, 999):
-            data = assert_ok(await rnet_items.delete_item(item_id=item_id))
+            data = assert_ok(await wreq_items.delete_item(item_id=item_id))
             assert data.item_id == item_id
 
 
-class TestRnetHeaders:
+class TestWreqHeaders:
     @pytest.mark.asyncio
-    async def test_headers_echoed(self, rnet_headers):
-        data = assert_ok(await rnet_headers.echo_headers(x_token="rnet-token", x_user_id="rnet-user"))
-        assert data.x_token == "rnet-token"
-        assert data.x_user_id == "rnet-user"
+    async def test_headers_echoed(self, wreq_headers):
+        data = assert_ok(await wreq_headers.echo_headers(x_token="Wreq-token", x_user_id="Wreq-user"))
+        assert data.x_token == "Wreq-token"
+        assert data.x_user_id == "Wreq-user"
 
 
-class TestRnetXHeaders:
+class TestWreqXHeaders:
     @pytest.mark.asyncio
-    async def test_x_headers_sent(self, rnet_xheaders):
-        data = assert_ok(await rnet_xheaders.echo_x_headers(token="rnet-tok", correlation_id="corr-42"))
-        assert data.x_token == "rnet-tok"
+    async def test_x_headers_sent(self, wreq_xheaders):
+        data = assert_ok(await wreq_xheaders.echo_x_headers(token="Wreq-tok", correlation_id="corr-42"))
+        assert data.x_token == "Wreq-tok"
         assert data.x_correlation_id == "corr-42"
 
 
-class TestRnetForm:
+class TestWreqForm:
     @pytest.mark.asyncio
-    async def test_form_submitted(self, rnet_form):
-        data = assert_ok(await rnet_form.submit_form(username="bob", password="p4ssw0rd"))
+    async def test_form_submitted(self, wreq_form):
+        data = assert_ok(await wreq_form.submit_form(username="bob", password="p4ssw0rd"))
         assert data.username == "bob"
         assert data.password == "p4ssw0rd"
 
 
-class TestRnetUpload:
+class TestWreqUpload:
     @pytest.mark.asyncio
-    async def test_upload_with_description(self, rnet_upload):
-        content = b"rnet file content"
-        data = assert_ok(await rnet_upload.upload(file=io.BytesIO(content), description="rnet test"))
+    async def test_upload_with_description(self, wreq_upload):
+        content = b"Wreq file content"
+        data = assert_ok(await wreq_upload.upload(file=io.BytesIO(content), description="Wreq test"))
         assert data.size == len(content)
-        assert data.description == "rnet test"
+        assert data.description == "Wreq test"
 
     @pytest.mark.asyncio
-    async def test_upload_default_description(self, rnet_upload):
+    async def test_upload_default_description(self, wreq_upload):
         content = b"bare minimum"
-        data = assert_ok(await rnet_upload.upload(file=io.BytesIO(content)))
+        data = assert_ok(await wreq_upload.upload(file=io.BytesIO(content)))
         assert data.size == len(content)
 
     @pytest.mark.asyncio
-    async def test_upload_size_matches(self, rnet_upload):
+    async def test_upload_size_matches(self, wreq_upload):
         content = b"y" * 512
-        data = assert_ok(await rnet_upload.upload(file=io.BytesIO(content)))
+        data = assert_ok(await wreq_upload.upload(file=io.BytesIO(content)))
         assert data.size == 512
 
 
-class TestRnetErrors:
+class TestWreqErrors:
     @pytest.mark.asyncio
-    async def test_400_parsed_as_error_message(self, rnet_errors):
-        err = assert_error(await rnet_errors.get_400())
+    async def test_400_parsed_as_error_message(self, wreq_errors):
+        err = assert_error(await wreq_errors.get_400())
         assert err.status == HTTPStatus.BAD_REQUEST
         assert err.status.is_client_error
         assert isinstance(err.error, ErrorMessage)
 
     @pytest.mark.asyncio
-    async def test_404_parsed_as_error_message(self, rnet_errors):
-        err = assert_error(await rnet_errors.get_404())
+    async def test_404_parsed_as_error_message(self, wreq_errors):
+        err = assert_error(await wreq_errors.get_404())
         assert err.status == HTTPStatus.NOT_FOUND
         assert err.status.is_client_error
         assert isinstance(err.error, ErrorMessage)
 
     @pytest.mark.asyncio
-    async def test_422_parsed_as_error_detail(self, rnet_errors):
-        err = assert_error(await rnet_errors.get_422())
+    async def test_422_parsed_as_error_detail(self, wreq_errors):
+        err = assert_error(await wreq_errors.get_422())
         assert err.status == HTTPStatus.UNPROCESSABLE_ENTITY
         assert isinstance(err.error, ErrorDetail)
         assert "field" in err.error.details
 
     @pytest.mark.asyncio
-    async def test_500_is_server_error(self, rnet_errors):
-        err = assert_error(await rnet_errors.get_500())
+    async def test_500_is_server_error(self, wreq_errors):
+        err = assert_error(await wreq_errors.get_500())
         assert err.status == HTTPStatus.INTERNAL_SERVER_ERROR
         assert err.status.is_server_error
 
@@ -1109,28 +1124,28 @@ class TestRnetErrors:
         assert isinstance(err.error, BadGatewayError)
 
     @pytest.mark.asyncio
-    async def test_empty_body_error_is_none(self, rnet_errors):
-        err = assert_error(await rnet_errors.get_empty())
+    async def test_empty_body_error_is_none(self, wreq_errors):
+        err = assert_error(await wreq_errors.get_empty())
         assert err.status == HTTPStatus.NOT_FOUND
         assert isinstance(err.error, UnknownError)
         assert not err.error.payload
 
     @pytest.mark.asyncio
-    async def test_error_carries_http_method(self, rnet_errors):
-        err = assert_error(await rnet_errors.get_400())
+    async def test_error_carries_http_method(self, wreq_errors):
+        err = assert_error(await wreq_errors.get_400())
         assert err.method == HTTPMethod.GET
 
     @pytest.mark.asyncio
-    async def test_error_carries_path(self, rnet_errors):
-        err = assert_error(await rnet_errors.get_404())
+    async def test_error_carries_path(self, wreq_errors):
+        err = assert_error(await wreq_errors.get_404())
         assert err.path is not None
         assert "404" in err.path
 
 
-class TestRnetMisc:
+class TestWreqMisc:
     @pytest.mark.asyncio
-    async def test_ok_response_parsed(self, rnet_misc):
-        data = assert_ok(await rnet_misc.get_with_request_id())
+    async def test_ok_response_parsed(self, wreq_misc):
+        data = assert_ok(await wreq_misc.get_with_request_id())
         assert data.ok is True
 
 

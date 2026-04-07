@@ -12,7 +12,7 @@ from msgspex import decoder
 
 from saronia.__meta__ import __version__
 from saronia.auth import AuthError
-from saronia.client.abc import ABCClient, MultipartFile, ResponseHandler
+from saronia.client.abc import ABCClient, ContentType, MultipartFile, ResponseHandler
 from saronia.error import APIError, NetworkError, StatusError, UncaughtError, UnknownError
 
 if typing.TYPE_CHECKING:
@@ -20,7 +20,6 @@ if typing.TYPE_CHECKING:
 
     from saronia.auth import Auth, AuthComposite
 
-_NONE_TYPES: typing.Final = frozenset((None, type(None)))
 _SENTINEL: typing.Final = object()
 DEFAULT_TIMEOUT: typing.Final = 30.0
 DEFAULT_USER_AGENT: typing.Final = "CPython/{py_major}.{py_minor}; ({system}; {platform}) {saronia} {http_client}".format(
@@ -63,6 +62,7 @@ class BaseClient(ABCClient, abc.ABC):
         *,
         as_result: bool,
         errors: tuple[typing.Any, ...],
+        content_type: ContentType,
         response_type: Option[typing.Any],
         json: Option[str | bytes],
         headers: Option[typing.Mapping[str, typing.Any]],
@@ -77,22 +77,33 @@ class BaseClient(ABCClient, abc.ABC):
 
     def _validate_response(
         self,
-        payload: bytes | None,
+        payload: str | bytes | None,
         status: HTTPStatus,
         response_type: typing.Any,
+        content_type: ContentType,
         response_handler: ResponseHandler | None = None,
         as_result: bool = False,
     ) -> typing.Any:
         if not payload:
-            if not (response_type is typing.Any or response_type in _NONE_TYPES):
+            if (content_type == "json" and response_type is not None) or content_type != "any":
                 raise msgspec.ValidationError("Payload is empty to validate.")
 
             response = None
         else:
-            try:
-                response = decoder.decode(payload, type=response_type)
-            except msgspec.DecodeError:
-                raise UnknownError(status, payload) from None
+            match content_type:
+                case "any" | "json":
+                    try:
+                        response = decoder.decode(payload, type=response_type)
+                    except msgspec.DecodeError:
+                        raise UnknownError(status, payload.encode() if isinstance(payload, str) else payload) from None
+                case "content":
+                    if not isinstance(payload, bytes):
+                        raise msgspec.ValidationError(f"Expected `bytes` payload, but `{type(payload).__name__}` were given.")
+                    response = payload
+                case "text":
+                    if not isinstance(payload, str):
+                        raise msgspec.ValidationError(f"Expected `str` payload, but `{type(payload).__name__}` were given.")
+                    response = payload
 
         if response_handler is not None:
             response = response_handler(response)
@@ -134,7 +145,7 @@ class BaseClient(ABCClient, abc.ABC):
                 case _:
                     pass
 
-        api_error = APIError[typing.Any](
+        api_error = APIError(
             error,
             method,
             status or HTTPStatus.BAD_REQUEST,

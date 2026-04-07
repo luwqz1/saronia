@@ -7,7 +7,7 @@ from warnings import deprecated as route_deprecated
 from kungfu import Result
 from msgspex import Model
 
-from saronia.client.abc import ResponseHandler
+from saronia.client.abc import ContentType, ResponseHandler
 from saronia.error import APIError
 
 type ParameterName = str
@@ -21,6 +21,66 @@ type RouteDecorator[**P, R] = typing.Callable[[typing.Callable[P, CoroutineType[
 @typing.overload
 def route[**P, R](method: HTTPMethod, path: str, /) -> RouteDecorator[P, R]: ...
 @typing.overload
+def route[**P, R](
+    method: HTTPMethod,
+    __path: str,
+    /,
+    *errors: typing.Any,
+    path: bool = True,
+    auth: Authorization | None = ...,
+    response: typing.Any = ...,
+    content_type: ContentType = ...,
+    response_handler: ResponseHandler = ...,
+) -> RouteDecorator[P, R]: ...
+@typing.overload
+def route[**P, R](
+    method: HTTPMethod,
+    path: str,
+    /,
+    *errors: typing.Any,
+    query: bool,
+    auth: Authorization | None = ...,
+    response: typing.Any = ...,
+    content_type: ContentType = ...,
+    response_handler: ResponseHandler = ...,
+) -> RouteDecorator[P, R]: ...
+@typing.overload
+def route[**P, R](
+    method: HTTPMethod,
+    path: str,
+    /,
+    *errors: typing.Any,
+    header: bool,
+    auth: Authorization | None = ...,
+    response: typing.Any = ...,
+    content_type: ContentType = ...,
+    response_handler: ResponseHandler = ...,
+) -> RouteDecorator[P, R]: ...
+@typing.overload
+def route[**P, R](
+    method: HTTPMethod,
+    path: str,
+    /,
+    *errors: typing.Any,
+    json: bool,
+    auth: Authorization | None = ...,
+    response: typing.Any = ...,
+    content_type: ContentType = ...,
+    response_handler: ResponseHandler = ...,
+) -> RouteDecorator[P, R]: ...
+@typing.overload
+def route[**P, R](
+    method: HTTPMethod,
+    path: str,
+    /,
+    *errors: typing.Any,
+    urlencoded: bool,
+    auth: Authorization | None = ...,
+    response: typing.Any = ...,
+    content_type: ContentType = ...,
+    response_handler: ResponseHandler = ...,
+) -> RouteDecorator[P, R]: ...
+@typing.overload
 def route[**P, **X, C, R](
     method: HTTPMethod,
     __path: str,
@@ -29,6 +89,7 @@ def route[**P, **X, C, R](
     form: typing.Callable[P, Model],
     path: bool = True,
     response: typing.Any = ...,
+    content_type: ContentType = ...,
     response_handler: ResponseHandler = ...,
     auth: Authorization | None = ...,
 ) -> typing.Callable[
@@ -44,6 +105,7 @@ def route[**P, **X, C, R](
     form: typing.Callable[P, Model],
     query: bool,
     response: typing.Any = ...,
+    content_type: ContentType = ...,
     response_handler: ResponseHandler = ...,
     auth: Authorization | None = ...,
 ) -> typing.Callable[
@@ -59,6 +121,7 @@ def route[**P, **X, C, R](
     form: typing.Callable[P, Model],
     header: bool,
     response: typing.Any = ...,
+    content_type: ContentType = ...,
     response_handler: ResponseHandler = ...,
     auth: Authorization | None = ...,
 ) -> typing.Callable[
@@ -74,6 +137,7 @@ def route[**P, **X, C, R](
     form: typing.Callable[P, Model],
     json: bool,
     response: typing.Any = ...,
+    content_type: ContentType = ...,
     response_handler: ResponseHandler = ...,
     auth: Authorization | None = ...,
 ) -> typing.Callable[
@@ -89,67 +153,13 @@ def route[**P, **X, C, R](
     form: typing.Callable[P, Model],
     urlencoded: bool,
     response: typing.Any = ...,
+    content_type: ContentType = ...,
     response_handler: ResponseHandler = ...,
     auth: Authorization | None = ...,
 ) -> typing.Callable[
     [typing.Callable[typing.Concatenate[C, X], CoroutineType[R]]],
     typing.Callable[typing.Concatenate[C, P], CoroutineType[R]],
 ]: ...
-@typing.overload
-def route[**P, R](
-    method: HTTPMethod,
-    __path: str,
-    /,
-    *errors: typing.Any,
-    path: bool = True,
-    auth: Authorization | None = ...,
-    response: typing.Any = ...,
-    response_handler: ResponseHandler = ...,
-) -> RouteDecorator[P, R]: ...
-@typing.overload
-def route[**P, R](
-    method: HTTPMethod,
-    path: str,
-    /,
-    *errors: typing.Any,
-    query: bool,
-    auth: Authorization | None = ...,
-    response: typing.Any = ...,
-    response_handler: ResponseHandler = ...,
-) -> RouteDecorator[P, R]: ...
-@typing.overload
-def route[**P, R](
-    method: HTTPMethod,
-    path: str,
-    /,
-    *errors: typing.Any,
-    header: bool,
-    auth: Authorization | None = ...,
-    response: typing.Any = ...,
-    response_handler: ResponseHandler = ...,
-) -> RouteDecorator[P, R]: ...
-@typing.overload
-def route[**P, R](
-    method: HTTPMethod,
-    path: str,
-    /,
-    *errors: typing.Any,
-    json: bool,
-    auth: Authorization | None = ...,
-    response: typing.Any = ...,
-    response_handler: ResponseHandler = ...,
-) -> RouteDecorator[P, R]: ...
-@typing.overload
-def route[**P, R](
-    method: HTTPMethod,
-    path: str,
-    /,
-    *errors: typing.Any,
-    urlencoded: bool,
-    auth: Authorization | None = ...,
-    response: typing.Any = ...,
-    response_handler: ResponseHandler = ...,
-) -> RouteDecorator[P, R]: ...
 
 def __route_http_method[**P, R](
     route_callable: typing.Callable[typing.Concatenate[typing.Any, P], R],
